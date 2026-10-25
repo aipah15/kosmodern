@@ -6,7 +6,9 @@ import { Room } from "@/types/room";
 import { TenantListSection } from "./TenantListSection";
 import { TenantDetailProfile } from "./TenantDetailProfile";
 import { TenantFormManage } from "./TenantFormManage";
-import { createClient } from "@/lib/supabase/client";
+import { tenantService } from "@/modules/tenants/services/tenantService";
+import { roomService } from "@/modules/rooms/services/roomService";
+import { billingService } from "@/modules/billing/services/billingService";
 
 interface PenghuniManagementSectionProps {
   onShowToast: (message: string, type?: "success" | "error" | "info") => void;
@@ -14,6 +16,7 @@ interface PenghuniManagementSectionProps {
   initialSelectedTenantName?: string | null;
 }
 
+// Komponen manajemen penghuni kos terpadu
 export const PenghuniManagementSection: React.FC<PenghuniManagementSectionProps> = ({
   onShowToast,
   onNavigateToVerification,
@@ -25,41 +28,57 @@ export const PenghuniManagementSection: React.FC<PenghuniManagementSectionProps>
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const supabase = createClient();
-
-  // Fetch tenants & rooms from Supabase
+  // Ambil data penghuni dan kamar via service layer
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [tenantsRes, roomsRes] = await Promise.all([
-        supabase.from("tenants").select("*").order("check_in_date", { ascending: false }),
-        supabase.from("rooms").select("*").order("room_number", { ascending: true }),
+      const [tenantsData, roomsData] = await Promise.all([
+        tenantService.getTenants(),
+        roomService.getRooms(),
       ]);
 
-      if (tenantsRes.error) throw tenantsRes.error;
-      if (roomsRes.error) throw roomsRes.error;
-
-      if (tenantsRes.data) {
-        setTenants(tenantsRes.data as Tenant[]);
-
-        // Check if initial tenant is requested (e.g. from RoomCard "Profil ↗")
-        if (initialSelectedTenantName) {
-          const match = (tenantsRes.data as Tenant[]).find(
-            (t) => t.full_name.toLowerCase() === initialSelectedTenantName.toLowerCase()
-          );
-          if (match) {
-            setSelectedTenant(match);
-            setViewMode("detail");
+      // Status tagihan diturunkan dari tabel bills, bukan kolom tenants.bill_status yang bisa usang
+      const bills = await billingService.getBills("all");
+      const startOfToday = new Date().setHours(0, 0, 0, 0);
+      const activeTenants = (tenantsData || [])
+        .filter((t) => t.status !== "inactive")
+        .map((t) => {
+          const mine = bills
+            .filter((b) => b.tenant_id === t.id && !["paid", "lunas", "draft"].includes(b.status))
+            .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+          if (mine.length === 0) {
+            return { ...t, bill_status: "paid" as const, overdue_days: 0, fine_amount: 0 };
           }
+          const first = mine[0];
+          const pending = mine.some((b) => b.status === "pending" || b.status === "menunggu_verifikasi");
+          const late = new Date(first.due_date).getTime() < startOfToday && !pending;
+          const overdueDays = late ? Math.ceil((startOfToday - new Date(first.due_date).getTime()) / 86400000) : 0;
+          return {
+            ...t,
+            bill_status: (pending ? "waiting_verification" : late ? "overdue" : "unpaid") as Tenant["bill_status"],
+            overdue_days: overdueDays,
+            fine_amount: Number(first.fine_amount || 0),
+            bill_period: first.period,
+            bill_amount: Number(first.amount || 0),
+          };
+        });
+      setTenants(activeTenants);
+
+      setRooms(roomsData || []);
+
+      // Cek apakah ada penghuni awal yang diminta dibuka profilnya
+      if (initialSelectedTenantName) {
+        const match = activeTenants.find(
+          (t) => t.full_name.toLowerCase() === initialSelectedTenantName.toLowerCase()
+        );
+        if (match) {
+          setSelectedTenant(match);
+          setViewMode("detail");
         }
       }
-
-      if (roomsRes.data) {
-        setRooms(roomsRes.data as Room[]);
-      }
     } catch (err: any) {
-      console.error("Error fetching tenants:", err.message);
-      onShowToast("Gagal memuat data penghuni dari server.", "error");
+      console.error("Gagal memuat data penghuni:", err);
+      onShowToast(`Gagal memuat data penghuni: ${err?.message || "kesalahan jaringan"}`, "error");
     } finally {
       setIsLoading(false);
     }
@@ -89,152 +108,49 @@ export const PenghuniManagementSection: React.FC<PenghuniManagementSectionProps>
     if (!confirmed) return;
 
     try {
-      // 1. Update tenant status to inactive
-      const { error: tenantErr } = await supabase
-        .from("tenants")
-        .update({
-          status: "inactive",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", tenant.id);
+      // 1. Nonaktifkan status penghuni via tenantService
+      await tenantService.updateTenant(tenant.id, { status: "inactive" });
 
-      if (tenantErr) throw tenantErr;
-
-      // 2. Update room status to available (kosong)
-      if (tenant.room_number) {
-        await supabase
-          .from("rooms")
-          .update({
-            status: "available",
-            tenant_name: null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("room_number", tenant.room_number);
+      // 2. Kosongkan unit kamar via roomService
+      if (tenant.room_id) {
+        await roomService.updateRoom(tenant.room_id, {
+          status: "available",
+          tenant_name: null,
+        });
       }
 
-      // Update state
       setTenants((prev) => prev.filter((t) => t.id !== tenant.id));
       setViewMode("list");
       setSelectedTenant(null);
       onShowToast(`Penghuni ${tenant.full_name} berhasil di-check out. Kamar ${tenant.room_number} kini Siap Huni.`, "success");
     } catch (err: any) {
-      onShowToast(`Gagal memproses check-out: ${err.message}`, "error");
+      onShowToast(`Gagal check out penghuni: ${err?.message || "kesalahan jaringan"}`, "error");
     }
   };
 
   const handleSaveTenant = async (formData: TenantFormData, tenantId?: string) => {
     try {
       if (tenantId) {
-        // Update existing tenant
-        const { error } = await supabase
-          .from("tenants")
-          .update({
-            full_name: formData.full_name,
-            nik: formData.nik,
-            phone: formData.phone,
-            email: formData.email,
-            occupation: formData.occupation,
-            institution: formData.institution,
-            emergency_contact_name: formData.emergency_contact_name,
-            emergency_contact_relation: formData.emergency_contact_relation,
-            emergency_contact_phone: formData.emergency_contact_phone,
-            room_id: formData.room_id,
-            room_number: formData.room_number,
-            floor: formData.floor,
-            room_type: formData.room_type,
-            check_in_date: formData.check_in_date,
-            due_date_day: formData.due_date_day,
-            rent_amount: formData.rent_amount,
-            deposit_amount: formData.deposit_amount,
-            invitation_code: formData.invitation_code,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", tenantId);
+        const updated = await tenantService.updateTenant(tenantId, formData);
 
-        if (error) throw error;
-
-        // Update local state
-        setTenants((prev) =>
-          prev.map((t) =>
-            t.id === tenantId
-              ? {
-                  ...t,
-                  ...formData,
-                }
-              : t
-          )
-        );
-
+        setTenants((prev) => prev.map((t) => (t.id === tenantId ? { ...t, ...updated } : t)));
         if (selectedTenant && selectedTenant.id === tenantId) {
-          setSelectedTenant({
-            ...selectedTenant,
-            ...formData,
-          });
+          setSelectedTenant({ ...selectedTenant, ...updated });
         }
 
         onShowToast(`Data penghuni ${formData.full_name} berhasil diperbarui!`, "success");
         setViewMode("detail");
       } else {
-        // Insert new tenant
-        const newCode = `KM-P${String(tenants.length + 1).padStart(3, "0")}`;
-        const { data, error } = await supabase
-          .from("tenants")
-          .insert([
-            {
-              tenant_code: newCode,
-              full_name: formData.full_name,
-              nik: formData.nik,
-              phone: formData.phone,
-              email: formData.email,
-              occupation: formData.occupation,
-              institution: formData.institution,
-              emergency_contact_name: formData.emergency_contact_name,
-              emergency_contact_relation: formData.emergency_contact_relation,
-              emergency_contact_phone: formData.emergency_contact_phone,
-              room_id: formData.room_id,
-              room_number: formData.room_number,
-              floor: formData.floor,
-              property_name: "Kost Yusi",
-              room_type: formData.room_type,
-              check_in_date: formData.check_in_date,
-              contract_type: "Bulanan",
-              due_date_day: formData.due_date_day,
-              rent_amount: formData.rent_amount,
-              deposit_amount: formData.deposit_amount,
-              status: "active",
-              bill_status: "waiting_verification",
-              bill_period: "Okt–Nov 2026",
-              bill_amount: formData.rent_amount + formData.deposit_amount,
-              overdue_days: 0,
-              fine_amount: 0,
-              invitation_code: formData.invitation_code,
-            },
-          ])
-          .select();
+        const created = await tenantService.createTenant(formData);
 
-        if (error) throw error;
-
-        // Also update room to occupied and set tenant name
-        await supabase
-          .from("rooms")
-          .update({
-            status: "occupied",
-            tenant_name: formData.full_name,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("room_number", formData.room_number);
-
-        if (data && data.length > 0) {
-          const created = data[0] as Tenant;
-          setTenants((prev) => [created, ...prev]);
-          setSelectedTenant(created);
-        }
+        setTenants((prev) => [created, ...prev]);
+        setSelectedTenant(created);
 
         onShowToast(`Penghuni ${formData.full_name} berhasil ditambahkan! Tautan aktivasi siap dibagikan.`, "success");
         setViewMode("list");
       }
     } catch (err: any) {
-      console.error("Save tenant error:", err);
+      console.error("Gagal menyimpan data penghuni:", err);
       onShowToast(`Gagal menyimpan data penghuni: ${err.message}`, "error");
       throw err;
     }
@@ -250,6 +166,7 @@ export const PenghuniManagementSection: React.FC<PenghuniManagementSectionProps>
           onSelectTenant={handleSelectTenant}
           onCreateTenant={handleStartCreate}
           onShowToast={onShowToast}
+          onNavigateToVerification={onNavigateToVerification}
         />
       )}
 
