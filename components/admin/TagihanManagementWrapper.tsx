@@ -6,6 +6,7 @@ import { Tenant } from "@/types/tenant";
 import { BillingManagementSection } from "./BillingManagementSection";
 import { ExtraBillFormSection } from "./ExtraBillFormSection";
 import { createClient } from "@/lib/supabase/client";
+import { DEFAULT_PROPERTY } from "@/lib/constants";
 
 interface TagihanManagementWrapperProps {
   onShowToast: (message: string, type?: "success" | "error" | "info") => void;
@@ -58,7 +59,7 @@ export const TagihanManagementWrapper: React.FC<TagihanManagementWrapperProps> =
           room_number: tenant.room_number,
           floor: tenant.floor || "Lt. 1",
           room_type: tenant.room_type || "Deluxe AC",
-          property_name: "Kost Yusi",
+          property_name: DEFAULT_PROPERTY.name,
           bill_category: formData.bill_category,
           title: formData.title,
           period: period,
