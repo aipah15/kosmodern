@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Wrench,
   AlertTriangle,
@@ -22,9 +22,28 @@ import {
   User,
   Sparkles,
   Camera,
+  Plus,
+  Search,
+  Filter,
+  CheckCheck,
+  Send,
+  Calendar,
+  Layers,
+  MapPin,
+  ShieldCheck,
+  Tag,
+  DollarSign,
+  AlertCircle,
+  LayoutGrid,
+  ListFilter,
+  ArrowRight,
+  Eye,
 } from "lucide-react";
-import { MaintenanceTicket, TicketStatus } from "@/types/maintenance";
+import { MaintenanceTicket, TicketStatus, TicketUrgency } from "@/types/maintenance";
 import { createClient } from "@/lib/supabase/client";
+import { DEFAULT_PROPERTY } from "@/lib/constants";
+import { tenantService } from "@/modules/tenants/services/tenantService";
+import { Tenant } from "@/types/tenant";
 
 interface MaintenanceManagementSectionProps {
   onShowToast?: (text: string, type?: "info" | "error" | "success") => void;
@@ -34,678 +53,1121 @@ export const MaintenanceManagementSection: React.FC<MaintenanceManagementSection
   onShowToast,
 }) => {
   const supabase = createClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Initial State matching Screenshot 1
-  const [tickets, setTickets] = useState<MaintenanceTicket[]>([
-    {
-      id: "1",
-      ticket_code: "#TK-0824",
-      title: "AC kamar bocor menetes air ke kasur",
-      description:
-        "Unit AC indoor mulai meneteskan air sejak kemarin malam. Suhu terasa kurang dingin dan tetesan air mengenai ujung ranjang. Mohon diperiksa pipa pembuangan atau freonnya ya Bu/Pak. Saya sedang di kantor, teknisi dipersilakan masuk pakai kunci serep di pos satpam.",
-      urgency: "urgent",
-      urgency_label: "URGENSI TINGGI (< 3 jam)",
-      status: "diproses",
-      status_label: "Sedang Diproses",
-      tenant_name: "Dimas Arya Pratama",
-      tenant_avatar: "DA",
-      room_number: "B-04",
-      floor: "Lantai 2",
-      lease_type: "Sewa Tahunan",
-      access_permission: "Diizinkan (Kunci di Pos Keamanan)",
-      tenant_phone: "081298765432",
-      area_location: "Kamar B-04 • Lantai 2",
-      created_time: "1 jam yang lalu (09:30 WIB)",
-      created_date_str: "Kamis, 12 Juni 2026 • 09:30 WIB",
-      photo_name: "ac_bocor_kamar_B04.jpg",
-      assigned_technician: "Pak Joko",
-      estimated_arrival: "Hari Ini, 15:30 WIB",
-      repair_cost: 120000,
-    },
-    {
-      id: "2",
-      ticket_code: "#TK-0825",
-      title: "Wi-Fi Router Lantai 2 sering putus-sambung",
-      description:
-        "Koneksi sering RTO tiap 15 menit terutama saat jam kerja WFH. Lampu indikator internet pada router sempat berkedip merah.",
-      urgency: "medium",
-      urgency_label: "SEDANG (1x24 jam)",
-      status: "baru",
-      status_label: "BARU (Menunggu Respon)",
-      tenant_name: "Siti Rahmawati (didukung 3 penghuni lain)",
-      tenant_avatar: "SR",
-      room_number: "Area Umum",
-      floor: "Koridor Lt. 2",
-      lease_type: "Fasilitas Bersama",
-      access_permission: "Area Terbuka",
-      tenant_phone: "081344556677",
-      area_location: "Area Umum • Koridor Lt. 2",
-      created_time: "Hari ini, 11:20 WIB",
-      created_date_str: "Kamis, 12 Juni 2026 • 11:20 WIB",
-      photo_name: "router_wifi_lt2.jpg",
-      assigned_technician: "Pak Joko",
-      estimated_arrival: "Besok, 10:00 WIB",
-      repair_cost: 0,
-    },
-    {
-      id: "3",
-      ticket_code: "#TK-0822",
-      title: "Tekanan air lantai 2 & 3 mengecil / tandon kosong",
-      description:
-        "Air keran shower sangat kecil sejak sore, suara mesin pendorong tandon mendengung tanpa mengalirkan air deras.",
-      urgency: "urgent",
-      urgency_label: "URGENSI TINGGI",
-      status: "diproses",
-      status_label: "Diproses (Pembersihan Pompa)",
-      tenant_name: "Aldi Pratama",
-      tenant_avatar: "AP",
-      room_number: "Kamar C-01",
-      floor: "Lantai 3",
-      lease_type: "Sewa Bulanan",
-      access_permission: "Akses Tandon Atap",
-      tenant_phone: "081912345678",
-      area_location: "Tandon Atap Utama",
-      created_time: "11 Jun 2026, 19:40 WIB",
-      created_date_str: "Rabu, 11 Juni 2026 • 19:40 WIB",
-      photo_name: "pompa_tandon_atas.jpg",
-      assigned_technician: "Pak Joko",
-      estimated_arrival: "Hari Ini, 14:00 WIB",
-      repair_cost: 150000,
-    },
-    {
-      id: "4",
-      ticket_code: "#TK-0819",
-      title: "Kran wastafel kamar mandi merembes",
-      description:
-        "Kran wastafel tidak bisa menutup rapat sehingga air terus menetes memenuhi ember.",
-      urgency: "low",
-      urgency_label: "SELESAI",
-      status: "selesai",
-      status_label: "Selesai",
-      tenant_name: "Dimas Arya",
-      tenant_avatar: "DA",
-      room_number: "B-04",
-      floor: "Lantai 2",
-      lease_type: "Sewa Tahunan",
-      access_permission: "Selesai Dikerjakan",
-      tenant_phone: "081298765432",
-      area_location: "Kamar B-04",
-      created_time: "05 Jun 2026",
-      created_date_str: "Jumat, 05 Juni 2026",
-      photo_name: "kran_wastafel_b04.jpg",
-      assigned_technician: "Pak Joko (Ganti seal karet)",
-      estimated_arrival: "05 Jun 2026",
-      repair_cost: 50000,
-      rating: 5.0,
-      feedback_note: "Puas",
-      completion_note: "Ganti seal karet",
-    },
-    {
-      id: "5",
-      ticket_code: "#TK-0810",
-      title: "Lampu sorot gerbang parkir redup & berkedip",
-      description:
-        "Lampu LED sorot gerbang malam hari berkedip sehingga area parkir motor agak remang.",
-      urgency: "low",
-      urgency_label: "SELESAI",
-      status: "selesai",
-      status_label: "Selesai",
-      tenant_name: "Budi Santoso",
-      tenant_avatar: "BS",
-      room_number: "A-01",
-      floor: "Lantai 1",
-      lease_type: "Sewa Bulanan",
-      access_permission: "Area Parkir",
-      tenant_phone: "081765432109",
-      area_location: "Parkiran Motor Utama",
-      created_time: "28 Mei 2026",
-      created_date_str: "Kamis, 28 Mei 2026",
-      photo_name: "lampu_gerbang_depan.jpg",
-      assigned_technician: "Pak Joko",
-      estimated_arrival: "28 Mei 2026",
-      repair_cost: 75000,
-      rating: 5.0,
-      feedback_note: "Puas",
-      completion_note: "Ganti lampu LED Philips 20W",
-    },
-  ]);
+  // Mode Tampilan: Papan Kanban (board) vs Tabel Ringkas (table)
+  const [viewMode, setViewMode] = useState<"board" | "table">("board");
 
-  const [selectedTicketId, setSelectedTicketId] = useState<string>("1");
-  const [selectedStatus, setSelectedStatus] = useState<TicketStatus>("diproses");
-  const [selectedTechnician, setSelectedTechnician] = useState("Pak Joko");
-  const [estimatedArrival, setEstimatedArrival] = useState("Hari Ini, 15:30 WIB");
-  const [repairCost, setRepairCost] = useState("120000");
+  // State Tiket Kerusakan
+  const [tickets, setTickets] = useState<MaintenanceTicket[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedUrgencyFilter, setSelectedUrgencyFilter] = useState<string>("all");
+
+  // Selected Ticket for Modal / Drawer Detail
+  const [activeTicket, setActiveTicket] = useState<MaintenanceTicket | null>(null);
+
+  // Edit / Action State for Modal
+  const [modalStatus, setModalStatus] = useState<TicketStatus>("diproses");
+  const [modalTechnician, setModalTechnician] = useState("");
+  const [modalArrival, setModalArrival] = useState("");
+  const [modalCost, setModalCost] = useState("0");
+  const [modalNote, setModalNote] = useState("");
+  const [uploadedReceiptName, setUploadedReceiptName] = useState<string | null>(null);
+
+  // Other Modals
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
+  const [isSpkModalOpen, setIsSpkModalOpen] = useState(false);
+  const [isNewTicketModalOpen, setIsNewTicketModalOpen] = useState(false);
 
-  // Sync from Supabase on mount
-  useEffect(() => {
-    async function loadTickets() {
-      try {
-        const { data } = await supabase
-          .from("maintenance_tickets")
-          .select("*")
-          .order("created_at", { ascending: false });
+  // Form Tiket Baru
+  const [newTicketData, setNewTicketData] = useState({
+    title: "",
+    description: "",
+    urgency: "urgent" as TicketUrgency,
+    tenant_id: "",
+    tenant_name: "",
+    room_number: "",
+    floor: "",
+    access_permission: "Diizinkan (Kunci di Pos Keamanan)",
+    tenant_phone: "",
+    assigned_technician: "",
+    repair_cost: 0,
+  });
 
-        if (data && data.length > 0) {
-          setTickets(data as MaintenanceTicket[]);
-          setSelectedTicketId(data[0].id);
-        }
-      } catch (err) {
-        console.error("Error loading tickets from Supabase:", err);
-      }
+  // Memuat tiket kerusakan & daftar penghuni aktif dari database
+  const loadTickets = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("maintenance_tickets")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      setTickets((data || []) as MaintenanceTicket[]);
+      setLoadError(null);
+    } catch (err: any) {
+      console.error("Gagal memuat tiket kerusakan:", err);
+      setLoadError(err?.message || "Gagal memuat data");
+      onShowToast?.(`Gagal memuat laporan kerusakan: ${err?.message || "kesalahan jaringan"}`, "error");
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  useEffect(() => {
     loadTickets();
-  }, [supabase]);
+    tenantService
+      .getTenants("active")
+      .then(setTenants)
+      .catch((err) => console.error("Gagal memuat penghuni:", err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const selectedTicket = tickets.find((t) => t.id === selectedTicketId) || tickets[0];
-
-  useEffect(() => {
-    if (selectedTicket) {
-      setSelectedStatus(selectedTicket.status);
-      setSelectedTechnician(selectedTicket.assigned_technician || "Pak Joko");
-      setEstimatedArrival(selectedTicket.estimated_arrival || "Hari Ini, 15:30 WIB");
-      setRepairCost(String(selectedTicket.repair_cost || 120000));
+  // Simpan perubahan tiket ke database, lalu sinkronkan state dengan baris hasil update
+  const persistTicket = async (
+    ticketId: string,
+    changes: Partial<MaintenanceTicket>
+  ): Promise<MaintenanceTicket | null> => {
+    const { data, error } = await supabase
+      .from("maintenance_tickets")
+      .update({ ...changes, updated_at: new Date().toISOString() })
+      .eq("id", ticketId)
+      .select()
+      .single();
+    if (error) {
+      onShowToast?.(`Gagal menyimpan perubahan tiket: ${error.message}`, "error");
+      return null;
     }
-  }, [selectedTicket]);
-
-  // Handle Save Status & Treatment
-  const handleSaveTreatment = async () => {
-    if (!selectedTicket) return;
-
-    try {
-      await supabase
-        .from("maintenance_tickets")
-        .update({
-          status: selectedStatus,
-          assigned_technician: selectedTechnician,
-          estimated_arrival: estimatedArrival,
-          repair_cost: Number(repairCost) || 0,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", selectedTicket.id);
-
-      setTickets((prev) =>
-        prev.map((t) =>
-          t.id === selectedTicket.id
-            ? {
-                ...t,
-                status: selectedStatus,
-                assigned_technician: selectedTechnician,
-                estimated_arrival: estimatedArrival,
-                repair_cost: Number(repairCost) || 0,
-              }
-            : t
-        )
-      );
-
-      onShowToast?.(
-        `Status tiket ${selectedTicket.ticket_code} berhasil diperbarui menjadi ${selectedStatus.toUpperCase()}!`,
-        "success"
-      );
-    } catch {
-      onShowToast?.("Berhasil memperbarui status pengerjaan tiket.", "success");
-    }
+    const saved = data as MaintenanceTicket;
+    setTickets((prev) => prev.map((t) => (t.id === ticketId ? saved : t)));
+    return saved;
   };
 
-  const handleRejectTicket = async () => {
-    if (!selectedTicket) return;
-
-    try {
-      await supabase
-        .from("maintenance_tickets")
-        .update({
-          status: "ditolak",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", selectedTicket.id);
-
-      setTickets((prev) =>
-        prev.map((t) => (t.id === selectedTicket.id ? { ...t, status: "ditolak" } : t))
-      );
-      setSelectedStatus("ditolak");
-      onShowToast?.(`Laporan ${selectedTicket.ticket_code} telah ditolak.`, "info");
-    } catch {
-      onShowToast?.("Laporan ditolak.", "info");
-    }
+  // Open Ticket Detail Modal
+  const handleOpenTicketDetail = (ticket: MaintenanceTicket) => {
+    setActiveTicket(ticket);
+    setModalStatus(ticket.status);
+    setModalTechnician(ticket.assigned_technician || "");
+    setModalArrival(ticket.estimated_arrival || "");
+    setModalCost(String(ticket.repair_cost || 0));
+    setModalNote(ticket.completion_note || "");
+    setUploadedReceiptName(null);
   };
 
-  const handleOpenWhatsApp = () => {
-    if (!selectedTicket) return;
-    const phone = selectedTicket.tenant_phone?.replace(/\D/g, "") || "6281298765432";
+  // Quick Action: Tandai Selesai Langsung
+  const handleQuickMarkResolved = async (ticketId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const saved = await persistTicket(ticketId, { status: "selesai", status_label: "Selesai" });
+    if (!saved) return;
+    if (activeTicket?.id === ticketId) {
+      setActiveTicket(saved);
+      setModalStatus("selesai");
+    }
+    onShowToast?.("Tiket berhasil diselesaikan.", "success");
+  };
+
+  // Quick Action: Pindahkan ke Diproses
+  const handleQuickProcess = async (ticketId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const saved = await persistTicket(ticketId, { status: "diproses", status_label: "Sedang Diproses" });
+    if (!saved) return;
+    if (activeTicket?.id === ticketId) {
+      setActiveTicket(saved);
+      setModalStatus("diproses");
+    }
+    onShowToast?.("Laporan telah dialihkan ke pengerjaan teknisi (Diproses).", "info");
+  };
+
+  // Save Modal Changes
+  const handleSaveModalTreatment = async () => {
+    if (!activeTicket) return;
+    const saved = await persistTicket(activeTicket.id, {
+      status: modalStatus,
+      assigned_technician: modalTechnician,
+      estimated_arrival: modalArrival,
+      repair_cost: Number(modalCost) || 0,
+      completion_note: modalNote,
+    });
+    if (!saved) return;
+    setActiveTicket(null);
+    onShowToast?.(`Tiket ${saved.ticket_code} berhasil diperbarui!`, "success");
+  };
+
+  // WhatsApp Penghuni
+  const handleOpenWhatsAppTenant = (ticket: MaintenanceTicket) => {
+    const phone = ticket.tenant_phone?.replace(/\D/g, "") || "";
+    if (!phone) {
+      onShowToast?.("Nomor WhatsApp penghuni belum tercatat.", "error");
+      return;
+    }
+    const cleanPhone = phone.startsWith("0") ? "62" + phone.slice(1) : phone;
     const msg = encodeURIComponent(
-      `Halo ${selectedTicket.tenant_name}, terkait laporan kendala "${selectedTicket.title}" di ${selectedTicket.room_number}, teknisi kami (${selectedTechnician}) dijadwalkan tiba ${estimatedArrival}.`
+      `Halo Kak ${ticket.tenant_name}, terkait laporan kendala "${ticket.title}" di kamar ${ticket.room_number}, teknisi kami (${ticket.assigned_technician || modalTechnician}) dijadwalkan tiba ${ticket.estimated_arrival || modalArrival}. Terima kasih! 🙏 - ${DEFAULT_PROPERTY.name || "Kost Yusi"}`
     );
-    window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
+    window.open(`https://wa.me/${cleanPhone}?text=${msg}`, "_blank");
   };
 
-  const handleContactTechnician = () => {
-    onShowToast?.(`Menghubungi ${selectedTechnician} via WhatsApp / Telepon...`, "info");
-    const techPhone = "6281234567890";
+  // WhatsApp Teknisi
+  const handleContactTechnician = (ticket: MaintenanceTicket) => {
     const msg = encodeURIComponent(
-      `Halo ${selectedTechnician}, ada tugas servis dari Kost Yusi: "${selectedTicket?.title}" di ${selectedTicket?.room_number}. Est. jadwal: ${estimatedArrival}.`
+      `SURAT PERINTAH KERJA (SPK)\nKost: ${DEFAULT_PROPERTY.name || "Kost Yusi"}\nPemilik: ${DEFAULT_PROPERTY.ownerName || "Arifa Andya Nafiisa"}\n\nHalo ${ticket.assigned_technician || modalTechnician}, mohon tindak lanjuti kendala:\n- No. Tiket: ${ticket.ticket_code}\n- Lokasi: ${ticket.area_location}\n- Kendala: ${ticket.title}\n- Deskripsi: "${ticket.description}"\n- Izin Akses: ${ticket.access_permission}\n- Est. Waktu Servis: ${ticket.estimated_arrival || modalArrival}\n\nTerima kasih!`
     );
-    window.open(`https://wa.me/${techPhone}?text=${msg}`, "_blank");
+    window.open(`https://wa.me/?text=${msg}`, "_blank");
+    onShowToast?.("Membuka WhatsApp penugasan teknisi...", "info");
   };
 
+  // Buat Laporan Baru (disimpan ke database)
+  const handleCreateNewTicket = async () => {
+    if (!newTicketData.title.trim()) {
+      onShowToast?.("Judul kendala wajib diisi!", "error");
+      return;
+    }
+    if (!newTicketData.tenant_name.trim() || !newTicketData.room_number.trim()) {
+      onShowToast?.("Pilih penghuni pelapor terlebih dahulu.", "error");
+      return;
+    }
+
+    const now = new Date();
+    const urgencyLabels: Record<TicketUrgency, string> = {
+      urgent: "URGENSI TINGGI (< 3 jam)",
+      medium: "SEDANG (1x24 jam)",
+      low: "RINGAN",
+    };
+    const maxCode = tickets.reduce((max, t) => {
+      const n = parseInt(t.ticket_code.replace(/\D/g, ""), 10);
+      return Number.isNaN(n) ? max : Math.max(max, n);
+    }, 0);
+
+    const { data, error } = await supabase
+      .from("maintenance_tickets")
+      .insert({
+        ticket_code: `#TK-${String(maxCode + 1).padStart(4, "0")}`,
+        tenant_id: newTicketData.tenant_id || null,
+        location_type: "pribadi",
+        title: newTicketData.title.trim(),
+        description: newTicketData.description.trim() || "Laporan dicatat langsung oleh pengelola kos.",
+        urgency: newTicketData.urgency,
+        urgency_label: urgencyLabels[newTicketData.urgency],
+        status: "baru",
+        status_label: "Menunggu Respon",
+        tenant_name: newTicketData.tenant_name,
+        tenant_avatar: newTicketData.tenant_name.slice(0, 2).toUpperCase(),
+        room_number: newTicketData.room_number,
+        floor: newTicketData.floor || null,
+        access_permission: newTicketData.access_permission,
+        tenant_phone: newTicketData.tenant_phone || null,
+        area_location: `Kamar ${newTicketData.room_number}${newTicketData.floor ? " • " + newTicketData.floor : ""}`,
+        created_time: now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+        created_date_str: now.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }),
+        assigned_technician: newTicketData.assigned_technician || null,
+        repair_cost: Number(newTicketData.repair_cost) || 0,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      onShowToast?.(`Gagal menyimpan laporan: ${error.message}`, "error");
+      return;
+    }
+
+    const created = data as MaintenanceTicket;
+    setTickets((prev) => [created, ...prev]);
+    setNewTicketData((prev) => ({ ...prev, title: "", description: "", tenant_id: "", tenant_name: "", room_number: "", floor: "", tenant_phone: "" }));
+    setIsNewTicketModalOpen(false);
+    onShowToast?.(`Laporan ${created.ticket_code} berhasil ditambahkan!`, "success");
+  };
+
+  // Filtered Tickets
+  const filteredTickets = tickets.filter((t) => {
+    const matchUrgency =
+      selectedUrgencyFilter === "all" || t.urgency === selectedUrgencyFilter;
+
+    const q = searchQuery.toLowerCase();
+    const matchSearch =
+      t.ticket_code.toLowerCase().includes(q) ||
+      t.title.toLowerCase().includes(q) ||
+      t.tenant_name.toLowerCase().includes(q) ||
+      t.room_number.toLowerCase().includes(q) ||
+      (t.description && t.description.toLowerCase().includes(q));
+
+    return matchUrgency && matchSearch;
+  });
+
+  // Grouped by Kanban Columns
+  const pendingTickets = filteredTickets.filter(
+    (t) => t.status === "baru" || (t.status === "diproses" && t.urgency === "urgent")
+  );
+  const inProgressTickets = filteredTickets.filter(
+    (t) => t.status === "diproses" && t.urgency !== "urgent"
+  );
+  const resolvedTickets = filteredTickets.filter(
+    (t) => t.status === "selesai" || t.status === "ditolak"
+  );
+
+  // Counts
   const urgentCount = tickets.filter((t) => t.urgency === "urgent").length;
+  const inProgressCount = tickets.filter((t) => t.status === "diproses").length;
+  const resolvedCount = tickets.filter((t) => t.status === "selesai").length;
 
   return (
     <div className="space-y-6">
-      {/* 1. Header Section matching Screenshot 1 */}
-      <div>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            Kelola Laporan Kerusakan & Fasilitas
-          </h1>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 text-rose-700 text-xs font-bold border border-rose-200">
-            <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
-            • {urgentCount} URGENT
-          </span>
+      {/* 1. Header Ringkas & Tombol Buat Laporan */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+              Laporan Kerusakan & Fasilitas
+            </h1>
+            {urgentCount > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 text-rose-700 text-xs font-bold border border-rose-200">
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+                {urgentCount} Perlu Ditangani Segera
+              </span>
+            )}
+          </div>
+          <p className="text-xs sm:text-sm text-slate-500 font-normal mt-1 leading-relaxed">
+            Pantau dan tindak lanjuti laporan perbaikan kamar secara jelas, cepat, dan transparan.
+          </p>
         </div>
-        <p className="text-xs sm:text-sm text-slate-500 font-normal mt-1 max-w-3xl leading-relaxed">
-          Pantau, jadwalkan teknisi, dan tindak lanjuti laporan kerusakan dari penghuni kos secara
-          terpusat dengan transparansi SLA real-time.
-        </p>
+
+        <div className="flex items-center gap-2.5 self-start sm:self-center">
+          {/* View Mode Toggle: Kanban vs Tabel */}
+          <div className="bg-slate-100 p-1 rounded-2xl flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setViewMode("board")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                viewMode === "board"
+                  ? "bg-white text-indigo-700 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+              title="Tampilan Papan Kanban"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Papan Status</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                viewMode === "table"
+                  ? "bg-white text-indigo-700 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+              title="Tampilan Daftar Tabel"
+            >
+              <ListFilter className="w-3.5 h-3.5" />
+              <span>Daftar Tabel</span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsNewTicketModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[#4f46e5] hover:bg-indigo-700 active:scale-95 text-white font-bold text-xs sm:text-sm shadow-md shadow-indigo-600/25 transition cursor-pointer"
+          >
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span>+ Catat Laporan</span>
+          </button>
+        </div>
       </div>
 
-      {/* 2. Main Two-Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Daftar Tiket Terbuka & Terkini (~5 cols) */}
-        <div className="lg:col-span-5 space-y-3">
-          <div className="flex items-center justify-between pb-1">
-            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              Daftar Tiket Terbuka & Terkini
-            </h2>
-            <span className="text-[11px] text-slate-400 font-medium">
-              Menampilkan {tickets.length} dari 23 laporan
-            </span>
+      {/* 2. Ringkasan Status 3 Langkah (Sangat Mudah Dipahami) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Kolom 1: Butuh Ditangani */}
+        <div className="bg-rose-50/60 border border-rose-200/80 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-500 text-white flex items-center justify-center font-bold shadow-xs">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">
+                TAHAP 1: BUTUH TINDAKAN
+              </span>
+              <h3 className="text-lg font-black text-slate-900">
+                {pendingTickets.length} Laporan
+              </h3>
+            </div>
           </div>
-
-          <div className="space-y-3">
-            {tickets.map((t) => {
-              const isSelected = selectedTicket?.id === t.id;
-
-              return (
-                <div
-                  key={t.id}
-                  onClick={() => setSelectedTicketId(t.id)}
-                  className={`bg-white rounded-2xl p-4 transition-all cursor-pointer border ${
-                    isSelected
-                      ? "border-[#4f46e5] ring-2 ring-indigo-500/10 shadow-md shadow-indigo-500/5"
-                      : "border-slate-100 hover:border-slate-300 hover:shadow-xs"
-                  }`}
-                >
-                  {/* Top Badges Row */}
-                  <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
-                    <div className="flex items-center gap-1.5">
-                      <span className="px-2 py-0.5 rounded-lg bg-indigo-50 text-[#4f46e5] font-bold text-[10px] border border-indigo-100">
-                        {t.ticket_code}
-                      </span>
-                      {t.urgency === "urgent" && (
-                        <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 font-bold text-[10px] border border-rose-200">
-                          ● {t.urgency_label || "URGENSI TINGGI"}
-                        </span>
-                      )}
-                      {t.urgency === "medium" && (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold text-[10px] border border-amber-200">
-                          ● {t.urgency_label || "SEDANG (1x24 jam)"}
-                        </span>
-                      )}
-                      {t.status === "selesai" && (
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px] border border-emerald-200">
-                          ✓ SELESAI
-                        </span>
-                      )}
-                      {t.status === "diproses" && (
-                        <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold text-[10px] border border-blue-200">
-                          {t.status_label || "Sedang Diproses"}
-                        </span>
-                      )}
-                      {t.status === "baru" && (
-                        <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold text-[10px]">
-                          BARU (Menunggu Respon)
-                        </span>
-                      )}
-                    </div>
-
-                    <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-slate-400" />
-                      {t.created_time}
-                    </span>
-                  </div>
-
-                  {/* Title */}
-                  <h3 className="text-sm font-bold text-slate-900 leading-snug">
-                    {t.title}
-                  </h3>
-
-                  {/* Snippet */}
-                  <p className="text-xs text-slate-500 font-normal line-clamp-2 mt-1 leading-relaxed">
-                    {t.description}
-                  </p>
-
-                  {/* Reporter & Room Row */}
-                  <div className="flex items-center justify-between text-xs mt-3 pt-2.5 border-t border-slate-100">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 font-bold text-[10px] flex items-center justify-center">
-                        {t.tenant_avatar || t.tenant_name.slice(0, 2).toUpperCase()}
-                      </div>
-                      <span className="font-semibold text-slate-700 text-xs truncate max-w-[170px]">
-                        {t.tenant_name}
-                      </span>
-                    </div>
-
-                    {t.rating ? (
-                      <span className="text-amber-500 font-bold text-[11px] flex items-center gap-1">
-                        <Star className="w-3.5 h-3.5 fill-current" />
-                        {t.rating} ({t.feedback_note || "Puas"})
-                      </span>
-                    ) : t.repair_cost && t.status === "selesai" ? (
-                      <span className="text-slate-500 text-[11px] font-medium">
-                        Biaya: Rp {t.repair_cost.toLocaleString("id-ID")}
-                      </span>
-                    ) : (
-                      <span className="text-indigo-600 font-medium text-[11px] flex items-center gap-0.5">
-                        {t.area_location || `Kamar ${t.room_number}`} <ChevronRight className="w-3.5 h-3.5" />
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <span className="text-xs font-semibold text-rose-700 bg-white/80 px-2.5 py-1 rounded-lg border border-rose-200">
+            {urgentCount} Urgent
+          </span>
         </div>
 
-        {/* Right Column: Selected Ticket Detail (~7 cols) */}
-        {selectedTicket && (
-          <div className="lg:col-span-7 bg-white rounded-3xl p-5 sm:p-6 border border-slate-100 shadow-[0_15px_35px_-15px_rgba(79,70,229,0.06)] space-y-5">
-            {/* Top Detail Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+        {/* Kolom 2: Sedang Dikerjakan */}
+        <div className="bg-blue-50/60 border border-blue-200/80 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs">
+              <Wrench className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block">
+                TAHAP 2: DIKERJAKAN TEKNISI
+              </span>
+              <h3 className="text-lg font-black text-slate-900">
+                {inProgressCount} Laporan
+              </h3>
+            </div>
+          </div>
+          <span className="text-xs font-semibold text-blue-700 bg-white/80 px-2.5 py-1 rounded-lg border border-blue-200">
+            Jadwal Aktif
+          </span>
+        </div>
+
+        {/* Kolom 3: Selesai */}
+        <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-xs">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">
+                TAHAP 3: SELESAI & TUNTAS
+              </span>
+              <h3 className="text-lg font-black text-slate-900">
+                {resolvedCount} Laporan
+              </h3>
+            </div>
+          </div>
+          <span className="text-xs font-semibold text-emerald-700 bg-white/80 px-2.5 py-1 rounded-lg border border-emerald-200">
+            {(() => {
+              const rated = tickets.filter((t) => t.status === "selesai" && typeof t.rating === "number");
+              if (rated.length === 0) return "Belum ada penilaian";
+              const avg = rated.reduce((a, t) => a + Number(t.rating), 0) / rated.length;
+              return `Rata-rata ${avg.toFixed(1)} / 5`;
+            })()}
+          </span>
+        </div>
+      </div>
+
+      {/* 3. Bar Filter & Pencarian Bersih */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="flex items-center gap-2 overflow-x-auto">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider shrink-0 pl-1">
+            Filter Urgensi:
+          </span>
+          {[
+            { id: "all", label: "Semua Urgensi" },
+            { id: "urgent", label: "🔴 Urgent Saja" },
+            { id: "medium", label: "🟡 Sedang" },
+            { id: "low", label: "🟢 Ringan" },
+          ].map((pill) => (
+            <button
+              key={pill.id}
+              type="button"
+              onClick={() => setSelectedUrgencyFilter(pill.id)}
+              className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 ${
+                selectedUrgencyFilter === pill.id
+                  ? "bg-[#4f46e5] text-white shadow-xs"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              {pill.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="relative sm:w-72">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Cari kode tiket, kamar, kendala..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-3 py-1.5 text-xs text-slate-800 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+          />
+        </div>
+      </div>
+
+      {/* 4. TAMPILAN 1: PAPAN STATUS KANBAN (SANGAT MUDAH DIPAHAMI) */}
+      {viewMode === "board" && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-start">
+          {/* KOLOM 1: Perlu Tindakan Segera */}
+          <div className="bg-slate-50/70 rounded-3xl p-4 border border-rose-200/80 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-rose-200/60">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+                <h3 className="font-bold text-xs sm:text-sm text-slate-900">
+                  Perlu Ditangani Segera
+                </h3>
+              </div>
+              <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[11px] font-bold">
+                {pendingTickets.length}
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {pendingTickets.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-400 bg-white rounded-2xl border border-dashed border-slate-200">
+                  Tidak ada laporan tertunda 🎉
+                </div>
+              ) : (
+                pendingTickets.map((t) => (
+                  <div
+                    key={t.id}
+                    onClick={() => handleOpenTicketDetail(t)}
+                    className="bg-white rounded-2xl p-4 border border-slate-200 hover:border-indigo-400 hover:shadow-md transition cursor-pointer space-y-3 group"
+                  >
+                    {/* Header Card */}
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
+                        {t.ticket_code}
+                      </span>
+                      {t.urgency === "urgent" ? (
+                        <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                          ● Urgent (&lt; 3 Jam)
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                          ● Sedang
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Judul & Kamar */}
+                    <div>
+                      <h4 className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition leading-snug">
+                        {t.title}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">
+                        {t.description}
+                      </p>
+                    </div>
+
+                    {/* Info Pelapor */}
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5 text-slate-700">
+                        <MapPin className="w-3.5 h-3.5 text-indigo-500" />
+                        <span className="font-bold text-[11px]">{t.room_number}</span>
+                        <span className="text-[10px] text-slate-400">({t.tenant_name.split(" ")[0]})</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400">{t.created_time}</span>
+                    </div>
+
+                    {/* Quick Button */}
+                    <div className="pt-1 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenTicketDetail(t);
+                        }}
+                        className="w-full py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center gap-1 transition cursor-pointer"
+                      >
+                        <Wrench className="w-3.5 h-3.5" />
+                        <span>Tugaskan & Jadwalkan</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* KOLOM 2: Sedang Diproses (Dikerjakan Teknisi) */}
+          <div className="bg-slate-50/70 rounded-3xl p-4 border border-blue-200/80 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-blue-200/60">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+                <h3 className="font-bold text-xs sm:text-sm text-slate-900">
+                  Sedang Dikerjakan Teknisi
+                </h3>
+              </div>
+              <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[11px] font-bold">
+                {inProgressTickets.length}
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {inProgressTickets.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-400 bg-white rounded-2xl border border-dashed border-slate-200">
+                  Tidak ada perbaikan yang berjalan.
+                </div>
+              ) : (
+                inProgressTickets.map((t) => (
+                  <div
+                    key={t.id}
+                    onClick={() => handleOpenTicketDetail(t)}
+                    className="bg-white rounded-2xl p-4 border border-slate-200 hover:border-blue-400 hover:shadow-md transition cursor-pointer space-y-3 group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                        {t.ticket_code}
+                      </span>
+                      <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                        Diproses
+                      </span>
+                    </div>
+
+                    <div>
+                      <h4 className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-blue-600 transition leading-snug">
+                        {t.title}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">
+                        {t.description}
+                      </p>
+                    </div>
+
+                    {/* Teknisi & Jadwal */}
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 text-[11px] space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500">Teknisi:</span>
+                        <span className="font-bold text-slate-800">{t.assigned_technician}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500">Jadwal:</span>
+                        <span className="font-semibold text-blue-700">{t.estimated_arrival}</span>
+                      </div>
+                    </div>
+
+                    {/* Tombol Selesaikan Langsung */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleQuickMarkResolved(t.id, e)}
+                      className="w-full py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center gap-1.5 border border-emerald-200 transition cursor-pointer"
+                    >
+                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                      <span>Tandai Selesai ✓</span>
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* KOLOM 3: Selesai & Tuntas */}
+          <div className="bg-slate-50/70 rounded-3xl p-4 border border-emerald-200/80 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-emerald-200/60">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+                <h3 className="font-bold text-xs sm:text-sm text-slate-900">
+                  Selesai & Riwayat Tuntas
+                </h3>
+              </div>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">
+                {resolvedTickets.length}
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {resolvedTickets.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-400 bg-white rounded-2xl border border-dashed border-slate-200">
+                  Belum ada tiket yang selesai.
+                </div>
+              ) : (
+                resolvedTickets.map((t) => (
+                  <div
+                    key={t.id}
+                    onClick={() => handleOpenTicketDetail(t)}
+                    className="bg-white rounded-2xl p-4 border border-slate-200 hover:border-emerald-400 hover:shadow-xs transition cursor-pointer space-y-3 group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                        {t.ticket_code}
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        ✓ Tuntas
+                      </span>
+                    </div>
+
+                    <div>
+                      <h4 className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-emerald-700 transition leading-snug">
+                        {t.title}
+                      </h4>
+                      <div className="flex items-center justify-between mt-1 text-[11px] text-slate-500">
+                        <span>{t.room_number} • {t.tenant_name.split(" ")[0]}</span>
+                        <span className="font-bold text-slate-900">
+                          Rp {(t.repair_cost || 0).toLocaleString("id-ID")}
+                        </span>
+                      </div>
+                    </div>
+
+                    {t.rating && (
+                      <div className="flex items-center justify-between text-xs bg-amber-50/60 p-2 rounded-xl border border-amber-200/60">
+                        <span className="text-[10px] font-medium text-amber-800">
+                          Review Penghuni:
+                        </span>
+                        <span className="text-amber-600 font-bold flex items-center gap-1 text-[11px]">
+                          <Star className="w-3.5 h-3.5 fill-current" />
+                          {t.rating} ({t.feedback_note || "Puas"})
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. TAMPILAN 2: DAFTAR TABEL TERSTRUKTUR */}
+      {viewMode === "table" && (
+        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200">
+                <tr>
+                  <th className="py-3 px-4">Kode & Judul Kendala</th>
+                  <th className="py-3 px-4">Kamar & Pelapor</th>
+                  <th className="py-3 px-4">Urgensi</th>
+                  <th className="py-3 px-4">Teknisi Bertugas</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4">Biaya</th>
+                  <th className="py-3 px-4 text-right">Tindakan</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                {filteredTickets.map((t) => (
+                  <tr
+                    key={t.id}
+                    onClick={() => handleOpenTicketDetail(t)}
+                    className="hover:bg-slate-50/80 transition cursor-pointer"
+                  >
+                    <td className="py-3 px-4">
+                      <span className="font-mono text-[10px] font-bold text-indigo-700 block">
+                        {t.ticket_code}
+                      </span>
+                      <span className="font-bold text-slate-900 block max-w-xs truncate">
+                        {t.title}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="font-bold text-slate-800 block">{t.room_number}</span>
+                      <span className="text-[11px] text-slate-500 block truncate max-w-[120px]">
+                        {t.tenant_name}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      {t.urgency === "urgent" ? (
+                        <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 text-[10px] font-bold border border-rose-200">
+                          Urgent
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold">
+                          Normal
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="text-slate-800 font-semibold block truncate max-w-[140px]">
+                        {t.assigned_technician || "-"}
+                      </span>
+                      <span className="text-[10px] text-slate-400">{t.estimated_arrival}</span>
+                    </td>
+                    <td className="py-3 px-4">
+                      {t.status === "selesai" ? (
+                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
+                          ✓ Selesai
+                        </span>
+                      ) : t.status === "diproses" ? (
+                        <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-bold border border-blue-200">
+                          Diproses
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 text-[10px] font-bold border border-purple-200">
+                          Baru
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 font-bold text-slate-900">
+                      {t.repair_cost ? `Rp ${t.repair_cost.toLocaleString("id-ID")}` : "-"}
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenTicketDetail(t);
+                        }}
+                        className="px-3 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-bold transition cursor-pointer"
+                      >
+                        Buka
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* 6. MODAL UTAMA: DETAIL TIKET & TINDAK LANJUT (BERSIH & TERORGANISIR) */}
+      {activeTicket && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] overflow-y-auto p-6 shadow-2xl border border-slate-100 space-y-5 animate-in fade-in zoom-in-95">
+            {/* Header Modal */}
+            <div className="flex items-start justify-between pb-3 border-b border-slate-100">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-[#4f46e5] uppercase tracking-wide">
-                    DETAIL TIKET {selectedTicket.ticket_code}
+                  <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
+                    {activeTicket.ticket_code}
                   </span>
-                  {selectedTicket.urgency === "urgent" && (
-                    <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 font-bold text-[10px] border border-rose-200">
-                      URGENT
+                  {activeTicket.urgency === "urgent" ? (
+                    <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 text-[10px] font-bold border border-rose-200">
+                      URGENT (&lt; 3 JAM)
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold">
+                      NORMAL
                     </span>
                   )}
                 </div>
-                <h2 className="text-lg sm:text-xl font-black text-slate-900 mt-1">
-                  {selectedTicket.title}
+                <h2 className="text-lg font-black text-slate-900 mt-1.5 leading-snug">
+                  {activeTicket.title}
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Dibuat : {selectedTicket.created_date_str || "Kamis, 12 Juni 2026 • 09:30 WIB"}
+                  Dilaporkan pada {activeTicket.created_date_str}
                 </p>
               </div>
 
-              {/* Action Icons */}
-              <div className="flex items-center gap-1.5 self-start sm:self-center">
-                <button
-                  type="button"
-                  onClick={() => onShowToast?.("Tautan tiket berhasil disalin!", "success")}
-                  className="w-8 h-8 rounded-xl bg-slate-50 text-slate-600 hover:bg-slate-100 flex items-center justify-center border border-slate-200 transition cursor-pointer"
-                  title="Bagikan Tiket"
-                >
-                  <Share2 className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="w-8 h-8 rounded-xl bg-slate-50 text-slate-600 hover:bg-slate-100 flex items-center justify-center border border-slate-200 transition cursor-pointer"
-                  title="Cetak Tiket"
-                >
-                  <Printer className="w-4 h-4" />
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTicket(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:text-slate-800 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            {/* Tenant Profile Card */}
-            <div className="bg-[#f8faff] rounded-2xl p-4 border border-indigo-100/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-start gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-indigo-600 text-white font-bold text-sm flex items-center justify-center shadow-xs">
-                  {selectedTicket.tenant_avatar || "DA"}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-bold text-slate-900">
-                      {selectedTicket.tenant_name}
-                    </h3>
-                    <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold">
-                      Penghuni Aktif
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 font-medium mt-0.5">
-                    Kamar {selectedTicket.room_number} • {selectedTicket.floor} ({selectedTicket.lease_type || "Sewa Tahunan"})
-                  </p>
-                  <div className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 mt-1.5">
+            {/* Bagian 1: Pelapor & Lokasi Kamar */}
+            <div className="bg-[#f8faff] rounded-2xl p-4 border border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  PELAPOR & LOKASI:
+                </span>
+                <h4 className="text-sm font-bold text-slate-900 mt-0.5">
+                  {activeTicket.tenant_name} • {activeTicket.room_number} ({activeTicket.floor})
+                </h4>
+                <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-600">
+                  <span className="inline-flex items-center gap-1 font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 text-[11px]">
                     <Key className="w-3 h-3" />
-                    <span>Izin Masuk: {selectedTicket.access_permission || "Diizinkan (Kunci di Pos Keamanan)"}</span>
-                  </div>
+                    {activeTicket.access_permission}
+                  </span>
                 </div>
               </div>
 
               <button
                 type="button"
-                onClick={handleOpenWhatsApp}
+                onClick={() => handleOpenWhatsAppTenant(activeTicket)}
                 className="self-start sm:self-center inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#25d366] hover:bg-[#20ba59] text-white text-xs font-bold shadow-xs transition cursor-pointer"
               >
                 <MessageSquare className="w-3.5 h-3.5" />
-                <span>WhatsApp</span>
+                <span>Chat WhatsApp</span>
               </button>
             </div>
 
-            {/* Box 1: Deskripsi Kendala dari Penghuni */}
-            <div className="space-y-1.5">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                DESKRIPSI KENDALA DARI PENGHUNI
-              </span>
-              <div className="bg-white rounded-2xl p-4 border border-slate-200/80 text-xs text-slate-700 leading-relaxed font-normal">
-                "{selectedTicket.description}"
-              </div>
-            </div>
-
-            {/* Box 2: Foto Bukti Kerusakan */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-slate-700 uppercase tracking-wider text-[11px]">
-                  FOTO BUKTI KERUSAKAN (1 BERKAS)
-                </span>
-                <span className="text-slate-400 text-[11px]">Diunggah 09:30 WIB</span>
-              </div>
-
-              {/* Realistic Photo Thumbnail Frame */}
-              <div className="relative rounded-2xl overflow-hidden border border-slate-200 group bg-slate-900 aspect-video sm:aspect-21/9 max-h-56">
-                <div
-                  className="w-full h-full bg-cover bg-center transition-all duration-300 group-hover:scale-105"
-                  style={{
-                    backgroundImage: `url('https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1200&q=80')`,
-                  }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent flex items-end justify-between p-3.5">
-                  <span className="text-white text-xs font-mono font-medium drop-shadow-sm flex items-center gap-1.5">
-                    <Camera className="w-3.5 h-3.5 text-slate-300" />
-                    {selectedTicket.photo_name || "ac_bocor_kamar_B04.jpg"}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setIsPhotoModalOpen(true)}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white/90 hover:bg-white text-slate-900 text-xs font-bold shadow-md backdrop-blur-xs transition cursor-pointer"
-                  >
-                    <Maximize2 className="w-3.5 h-3.5" />
-                    <span>Perbesar Foto</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Box 3: Tindak Lanjut Pemilik Kos (LANGKAH EKSEKUSI) */}
-            <div className="bg-[#f8faff] rounded-2xl p-5 border border-indigo-100/80 space-y-4">
-              <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
-                <div className="flex items-center gap-2">
-                  <Wrench className="w-4 h-4 text-[#4f46e5]" />
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Tindak Lanjut Pemilik Kos
-                  </h3>
-                </div>
-                <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
-                  LANGKAH EKSEKUSI
-                </span>
-              </div>
-
-              {/* Status Pengerjaan Tiket Tabs */}
+            {/* Bagian 2: Deskripsi & Foto Bukti */}
+            <div className="space-y-3">
               <div>
-                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
-                  1. Status Pengerjaan Tiket
-                </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {(["baru", "diproses", "selesai", "ditolak"] as TicketStatus[]).map((st) => {
-                    const isTabActive = selectedStatus === st;
-                    const labels: Record<TicketStatus, string> = {
-                      baru: "Baru",
-                      diproses: "Diproses",
-                      selesai: "Selesai",
-                      ditolak: "Tolak",
-                    };
-
-                    return (
-                      <button
-                        key={st}
-                        type="button"
-                        onClick={() => setSelectedStatus(st)}
-                        className={`py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                          isTabActive
-                            ? "bg-[#4f46e5] text-white shadow-xs"
-                            : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-                        }`}
-                      >
-                        {labels[st]}
-                      </button>
-                    );
-                  })}
-                </div>
+                <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                  Keterangan Kendala:
+                </span>
+                <p className="text-xs text-slate-700 bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 leading-relaxed font-normal">
+                  "{activeTicket.description}"
+                </p>
               </div>
 
-              {/* Form Row 1: Teknisi Ditugaskan & Estimasi Kedatangan */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                    Teknisi Ditugaskan
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={selectedTechnician}
-                      onChange={(e) => setSelectedTechnician(e.target.value)}
-                      className="w-full bg-white rounded-xl pl-3 pr-8 py-2.5 text-xs text-slate-800 border border-slate-200/80 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-xs cursor-pointer"
-                    >
-                      <option value="Pak Joko">Pak Joko</option>
-                      <option value="Pak Budi (Teknisi AC)">Pak Budi (Teknisi AC)</option>
-                      <option value="Pak Slamet (Listrik)">Pak Slamet (Listrik)</option>
-                      <option value="Mandor Supri (Plumbing)">Mandor Supri (Plumbing)</option>
-                    </select>
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              {activeTicket.photo_url && (
+                <div className="space-y-1">
+                  <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">
+                    Foto Bukti Kerusakan:
+                  </span>
+                  <div className="relative rounded-2xl overflow-hidden border border-slate-200 group bg-slate-900 max-h-48 aspect-21/9">
+                    <img
+                      src={activeTicket.photo_url}
+                      alt="Bukti Kerusakan"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end justify-between p-3">
+                      <span className="text-white text-xs font-mono drop-shadow-sm">
+                        {activeTicket.photo_name || "foto_bukti.jpg"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsPhotoModalOpen(true)}
+                        className="px-2.5 py-1 rounded-lg bg-white/90 hover:bg-white text-slate-900 text-xs font-bold transition cursor-pointer"
+                      >
+                        Perbesar Foto
+                      </button>
+                    </div>
                   </div>
                 </div>
+              )}
+            </div>
 
+            {/* Bagian 3: Formulir Eksekusi & Penugasan Teknisi */}
+            <div className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-4">
+              <span className="text-xs font-black text-slate-900 uppercase tracking-wider block pb-2 border-b border-slate-200">
+                PENGATURAN STATUS & TEKNISI
+              </span>
+
+              {/* Status Radio / Buttons */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                  Status Tiket Saat Ini:
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: "baru", label: "Baru (Antrean)" },
+                    { id: "diproses", label: "Sedang Diproses" },
+                    { id: "selesai", label: "Selesai (Tuntas)" },
+                  ].map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setModalStatus(s.id as TicketStatus)}
+                      className={`py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                        modalStatus === s.id
+                          ? "bg-[#4f46e5] text-white shadow-xs"
+                          : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Teknisi & Estimasi */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                    Estimasi Kedatangan
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                    Teknisi Ditugaskan:
                   </label>
                   <input
                     type="text"
-                    value={estimatedArrival}
-                    onChange={(e) => setEstimatedArrival(e.target.value)}
-                    placeholder="Contoh: Hari Ini, 15:30 WIB"
-                    className="w-full bg-white rounded-xl px-3 py-2.5 text-xs text-slate-800 border border-slate-200/80 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-xs"
+                    list="technician-options"
+                    value={modalTechnician}
+                    onChange={(e) => setModalTechnician(e.target.value)}
+                    placeholder="Nama teknisi"
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 font-bold"
+                  />
+                  <datalist id="technician-options">
+                    {Array.from(new Set(tickets.map((t) => t.assigned_technician).filter(Boolean))).map((name) => (
+                      <option key={name} value={name as string} />
+                    ))}
+                  </datalist>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                    Estimasi Kedatangan / Waktu Servis:
+                  </label>
+                  <input
+                    type="text"
+                    value={modalArrival}
+                    onChange={(e) => setModalArrival(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 font-bold"
                   />
                 </div>
               </div>
 
-              {/* Form Row 2: Estimasi Biaya Perbaikan */}
-              <div>
-                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                  Estimasi Biaya Perbaikan (Rp)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">
-                    Rp
-                  </span>
+              {/* Biaya & Catatan */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                    Biaya Perbaikan / Sparepart (Rp):
+                  </label>
                   <input
                     type="number"
-                    value={repairCost}
-                    onChange={(e) => setRepairCost(e.target.value)}
-                    className="w-full bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold text-slate-900 border border-slate-200/80 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-xs"
+                    value={modalCost}
+                    onChange={(e) => setModalCost(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 font-bold"
                   />
                 </div>
-              </div>
-
-              {/* Form Row 3: Foto Hasil Servis Dropzone */}
-              <div>
-                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                  Foto Hasil Servis / Nota Pembayaran (Opsional saat ini)
-                </label>
-                <div
-                  onClick={() => onShowToast?.("Buka unggah bukti hasil servis...", "info")}
-                  className="border-2 border-dashed border-indigo-200 bg-white hover:bg-indigo-50/50 rounded-2xl p-4 text-center cursor-pointer transition"
-                >
-                  <UploadCloud className="w-6 h-6 text-[#4f46e5] mx-auto mb-1" />
-                  <p className="text-xs font-bold text-slate-800">
-                    Klik atau seret foto bukti pekerjaan teknisi
-                  </p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
-                    Mendukung JPG, PNG, PDF maks 5MB
-                  </p>
-                </div>
-              </div>
-
-              {/* Execution Action Buttons */}
-              <div className="pt-2 space-y-2">
-                <button
-                  type="button"
-                  onClick={handleSaveTreatment}
-                  className="w-full py-3 rounded-2xl bg-[#4f46e5] hover:bg-[#4338ca] text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 transition cursor-pointer"
-                >
-                  <FileText className="w-4 h-4" />
-                  <span>Perbarui Status & Simpan Penanganan</span>
-                </button>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={handleContactTechnician}
-                    className="py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
-                  >
-                    <Phone className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Hubungi Teknisi</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleRejectTicket}
-                    className="py-2.5 rounded-xl border border-rose-200 bg-rose-50/50 hover:bg-rose-100 text-rose-600 text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
-                  >
-                    <XCircle className="w-3.5 h-3.5" />
-                    <span>Tolak Laporan</span>
-                  </button>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                    Catatan Solusi Perbaikan:
+                  </label>
+                  <input
+                    type="text"
+                    value={modalNote}
+                    onChange={(e) => setModalNote(e.target.value)}
+                    placeholder="Contoh: Pipa AC dibersihkan & freon diisi"
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-white text-slate-800"
+                  />
                 </div>
               </div>
             </div>
-          </div>
-        )}
-      </div>
 
-      {/* Photo Zoom Modal */}
-      {isPhotoModalOpen && selectedTicket && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            {/* Action Buttons Modal */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-100">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => handleContactTechnician(activeTicket)}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Phone className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Kirim SPK ke WA Teknisi</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => setActiveTicket(null)}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                >
+                  Tutup
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveModalTreatment}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#4f46e5] hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition cursor-pointer"
+                >
+                  Simpan Perubahan
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 7. MODAL BUAT LAPORAN BARU */}
+      {isNewTicketModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-[#4f46e5] flex items-center justify-center">
+                  <Wrench className="w-4 h-4" />
+                </div>
+                <h3 className="text-base font-black text-slate-900">Catat Kendala Kamar Baru</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNewTicketModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:text-slate-800 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                  Judul Kendala / Kerusakan *
+                </label>
+                <input
+                  type="text"
+                  value={newTicketData.title}
+                  onChange={(e) => setNewTicketData({ ...newTicketData, title: e.target.value })}
+                  placeholder="Contoh: Lampu kamar mandi mati"
+                  className="w-full text-xs p-3 rounded-xl border border-slate-200 text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                  Penghuni Pelapor *
+                </label>
+                <select
+                  value={newTicketData.tenant_id}
+                  onChange={(e) => {
+                    const t = tenants.find((x) => x.id === e.target.value);
+                    setNewTicketData({
+                      ...newTicketData,
+                      tenant_id: e.target.value,
+                      tenant_name: t?.full_name || "",
+                      room_number: t?.room_number || "",
+                      floor: t?.floor || "",
+                      tenant_phone: t?.phone || "",
+                    });
+                  }}
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-white text-slate-800"
+                >
+                  <option value="">Pilih penghuni…</option>
+                  {tenants.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.full_name} — Kamar {t.room_number}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                  Tingkat Urgensi
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: "urgent", label: "Urgent (< 3 jam)" },
+                    { id: "medium", label: "Sedang" },
+                    { id: "low", label: "Ringan" },
+                  ].map((u) => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() =>
+                        setNewTicketData({ ...newTicketData, urgency: u.id as TicketUrgency })
+                      }
+                      className={`p-2 rounded-xl text-center font-bold text-[11px] transition cursor-pointer ${
+                        newTicketData.urgency === u.id
+                          ? "bg-rose-50 text-rose-700 border border-rose-300"
+                          : "bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100"
+                      }`}
+                    >
+                      {u.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                  Deskripsi Kendala
+                </label>
+                <textarea
+                  rows={3}
+                  value={newTicketData.description}
+                  onChange={(e) =>
+                    setNewTicketData({ ...newTicketData, description: e.target.value })
+                  }
+                  placeholder="Keterangan singkat..."
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 text-slate-800"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsNewTicketModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateNewTicket}
+                className="px-5 py-2 rounded-xl bg-[#4f46e5] hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition cursor-pointer"
+              >
+                Simpan Laporan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 8. MODAL ZOOM FOTO */}
+      {isPhotoModalOpen && activeTicket && activeTicket.photo_url && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-2xl w-full p-5 space-y-3 relative shadow-2xl animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <h3 className="font-bold text-sm text-slate-900">
-                Foto Bukti Kendala: {selectedTicket.title}
+              <h3 className="font-bold text-sm text-slate-900 truncate">
+                Foto Bukti: {activeTicket.title}
               </h3>
               <button
                 type="button"
                 onClick={() => setIsPhotoModalOpen(false)}
-                className="p-1 rounded-xl text-slate-400 hover:text-slate-800 transition cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -713,18 +1175,17 @@ export const MaintenanceManagementSection: React.FC<MaintenanceManagementSection
 
             <div className="rounded-2xl overflow-hidden aspect-video bg-slate-900">
               <img
-                src="https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1200&q=80"
-                alt="Bukti Kerusakan"
+                src={activeTicket.photo_url}
+                alt="Foto Kerusakan"
                 className="w-full h-full object-cover"
               />
             </div>
 
-            <div className="flex justify-between items-center text-xs text-slate-500 pt-1">
-              <span>{selectedTicket.photo_name}</span>
+            <div className="flex justify-end pt-1">
               <button
                 type="button"
                 onClick={() => setIsPhotoModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold cursor-pointer"
               >
                 Tutup
               </button>
