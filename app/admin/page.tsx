@@ -1,17 +1,16 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Sparkles, CheckCircle2, AlertCircle, ShieldAlert } from "lucide-react";
+import { Sparkles, CheckCircle2, AlertCircle } from "lucide-react";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { KpiStats } from "@/components/admin/KpiStats";
-import { PaymentVerificationSection, PaymentProof } from "@/components/admin/PaymentVerificationSection";
+import { PaymentVerificationSection } from "@/components/admin/PaymentVerificationSection";
 import { RoomAvailabilitySection } from "@/components/admin/RoomAvailabilitySection";
 import { OverdueResidentsSection } from "@/components/admin/OverdueResidentsSection";
-import { AnnouncementModal } from "@/components/admin/AnnouncementModal";
-import { createClient } from "@/lib/supabase/client";
 
-import { RoomManagementSection } from "@/components/admin/RoomManagementSection";
+// Import komponen modular per domain
+import { RoomManagement } from "@/modules/rooms/components/RoomManagement";
 import { PenghuniManagementSection } from "@/components/admin/PenghuniManagementSection";
 import { TagihanManagementWrapper } from "@/components/admin/TagihanManagementWrapper";
 import { ProofVerificationPage } from "@/components/admin/ProofVerificationPage";
@@ -21,139 +20,168 @@ import { AutoBillingReminderSection } from "@/components/admin/AutoBillingRemind
 import { CommunalAreaMonitoringSection } from "@/components/admin/CommunalAreaMonitoringSection";
 import { CreateAnnouncementSection } from "@/components/admin/CreateAnnouncementSection";
 
+// Import hook autentikasi & service modular
+import { useAuth } from "@/modules/auth/hooks/useAuth";
+import { proofService } from "@/modules/billing/services/proofService";
+import { billingService } from "@/modules/billing/services/billingService";
+import { PaymentProofItem } from "@/types/proof";
+import { DEFAULT_PROPERTY } from "@/lib/constants";
+import { createClient } from "@/lib/supabase/client";
+import { roomService } from "@/modules/rooms/services/roomService";
+
+// Daftar tab menu admin untuk navigasi mobile & desktop
+const ADMIN_TABS = [
+  { id: "dasbor", label: "Dasbor" },
+  { id: "properti", label: "Properti & Kamar" },
+  { id: "tagihan", label: "Tagihan" },
+  { id: "verifikasi", label: "Verifikasi" },
+  { id: "penghuni", label: "Penghuni" },
+  { id: "pengaturan", label: "Pengaturan" },
+  { id: "tagihan_otomatis", label: "Tagihan Otomatis" },
+  { id: "laporan_kerusakan", label: "Laporan Kerusakan" },
+  { id: "pemantauan", label: "Area Bersama" },
+];
+
+// Halaman utama Dasbor Pemilik Kos (Admin Portal)
 export default function AdminDashboardPage() {
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [activeTab, setActiveTab] = useState("buat_pengumuman"); // Default to buat_pengumuman matching newest image
+  // 1. Guard Autentikasi Modular: Hanya pemilik (owner) yang diizinkan masuk
+  const { isLoading: isCheckingAuth, isAuthenticated, logout } = useAuth({
+    requireAuth: true,
+    requireOwner: true,
+    redirectTo: "/?error=unauthorized",
+  });
+
+  const [activeTab, setActiveTab] = useState("dasbor");
   const [previousTab, setPreviousTab] = useState("dasbor");
   const [selectedTenantName, setSelectedTenantName] = useState<string | null>(null);
-  const [isAnnouncementOpen, setIsAnnouncementOpen] = useState(false);
-  const [proofs, setProofs] = useState<PaymentProof[]>([]);
+  const [proofs, setProofs] = useState<PaymentProofItem[]>([]);
+  const [ownerName, setOwnerName] = useState<string>(DEFAULT_PROPERTY.ownerName);
+  const [propertyName, setPropertyName] = useState<string>(DEFAULT_PROPERTY.name);
+  const [roomCount, setRoomCount] = useState(0);
   const [toastMessage, setToastMessage] = useState<{
     text: string;
     type: "info" | "error" | "success";
   } | null>(null);
-
-  const supabase = createClient();
 
   const showToast = (text: string, type: "info" | "error" | "success" = "success") => {
     setToastMessage({ text, type });
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // 1. Client-Side Auth Guard: Ensure only logged-in owners can view this page
+  // Baca parameter rute tab jika diberikan di URL
   useEffect(() => {
-    async function verifyAuth() {
-      try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-        if (userError || !user) {
-          window.location.replace("/?error=unauthorized");
-          return;
-        }
-
-        // Check if user is owner
-        const role = user.user_metadata?.role;
-        const isOwner = role === "owner" || user.email === "owner@kostyusi.com";
-
-        if (!isOwner) {
-          window.location.replace("/?error=forbidden");
-          return;
-        }
-
-        setIsAuthenticated(true);
-
-        // Check query param for tab if any
-        if (typeof window !== "undefined") {
-          const params = new URLSearchParams(window.location.search);
-          const tabParam = params.get("tab");
-          if (tabParam) {
-            setActiveTab(tabParam);
-          }
-        }
-      } catch {
-        window.location.replace("/?error=unauthorized");
-      } finally {
-        setIsCheckingAuth(false);
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      if (tabParam) {
+        setActiveTab(tabParam);
       }
     }
+  }, []);
 
-    verifyAuth();
-  }, [supabase]);
-
-  // 2. Fetch payment proofs from Supabase
+  // 2. Memuat data bukti pembayaran via proofService modular
   useEffect(() => {
     if (!isAuthenticated) return;
 
     async function loadProofs() {
       try {
-        const { data, error } = await supabase
-          .from("payment_proofs")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (data && data.length > 0) {
-          setProofs(data as PaymentProof[]);
-        }
-      } catch {
-        // Fallback default sample proofs are provided in component
+        const data = await proofService.getPaymentProofs("all");
+        setProofs(data);
+      } catch (err: any) {
+        showToast(`Gagal memuat bukti pembayaran: ${err?.message || "kesalahan jaringan"}`, "error");
       }
     }
+
     loadProofs();
-  }, [isAuthenticated, supabase]);
+  }, [isAuthenticated]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    window.location.href = "/";
-  };
+  // Nama pemilik/properti dari Pengaturan, jumlah kamar dari tabel rooms
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const supabase = createClient();
+    supabase
+      .from("property_settings")
+      .select("profile")
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.profile?.ownerName) setOwnerName(data.profile.ownerName);
+        if (data?.profile?.propertyName) setPropertyName(data.profile.propertyName);
+      });
+    roomService
+      .getRooms("all")
+      .then((rooms) => setRoomCount(rooms.length))
+      .catch(() => undefined);
+  }, [isAuthenticated]);
 
-  const handleApproveProof = async (id: string) => {
+  // Persetujuan bukti transfer pembayaran
+  const handleApproveProof = async (id: string): Promise<boolean> => {
     try {
-      await supabase
-        .from("payment_proofs")
-        .update({ status: "approved" })
-        .eq("id", id);
-      showToast("Bukti transfer disetujui & kwitansi resmi berhasil diterbitkan!");
-    } catch {
-      showToast("Bukti pembayaran telah disetujui.", "success");
+      const target = proofs.find((p) => p.id === id);
+      await proofService.approveProof(id, target?.invoice_number);
+      showToast("Bukti transfer disetujui & status tagihan berhasil diperbarui!");
+      setProofs(await proofService.getPaymentProofs("all"));
+      return true;
+    } catch (err: any) {
+      showToast(`Gagal memperbarui status bukti transfer: ${err?.message || "kesalahan jaringan"}`, "error");
+      return false;
     }
   };
 
-  const handleRejectProof = async (id: string) => {
+  // Penolakan bukti transfer pembayaran
+  const handleRejectProof = async (id: string): Promise<boolean> => {
     try {
-      await supabase
-        .from("payment_proofs")
-        .update({ status: "rejected" })
-        .eq("id", id);
-      showToast("Bukti pembayaran ditolak. Notifikasi dikirim ke penghuni.", "info");
-    } catch {
+      await proofService.rejectProof(id, "Bukti transfer tidak valid atau tidak terbaca.");
       showToast("Bukti pembayaran ditolak.", "info");
+      setProofs(await proofService.getPaymentProofs("all"));
+      return true;
+    } catch (err: any) {
+      showToast(`Gagal menolak bukti transfer: ${err?.message || "kesalahan jaringan"}`, "error");
+      return false;
     }
   };
 
-  const handleSendAnnouncement = (title: string, message: string, target: string) => {
-    showToast(`Pengumuman "${title}" berhasil disiarkan ke ${target === "all" ? "semua penghuni" : target}!`);
+  // Unduh rekap seluruh tagihan sebagai CSV dari data DB
+  const handleDownloadReport = async () => {
+    try {
+      const bills = await billingService.getBills("all");
+      if (bills.length === 0) {
+        showToast("Belum ada data tagihan untuk diunduh.", "info");
+        return;
+      }
+      const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const rows = [
+        "No. Invoice,Penghuni,Kamar,Jenis Tagihan,Periode,Nominal,Denda,Status,Jatuh Tempo,Dibayar Pada",
+        ...bills.map((b) =>
+          [b.invoice_number, b.tenant_name, b.room_number, b.title, b.period, b.amount, b.fine_amount, b.status, b.due_date, b.paid_at].map(esc).join(",")
+        ),
+      ];
+      const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `rekap_tagihan_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast("Laporan rekap tagihan berhasil diunduh.");
+    } catch (err: any) {
+      showToast(`Gagal mengunduh laporan: ${err?.message || "kesalahan jaringan"}`, "error");
+    }
   };
 
-  const handleDownloadReport = () => {
-    showToast("Mengunduh laporan rekap keuangan Juni 2026 (Excel/PDF)...");
-  };
-
-  // Loading screen while verifying authentication
+  // Tampilan loading saat memverifikasi sesi login
   if (isCheckingAuth) {
     return (
       <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#f8faff] text-slate-800">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-[#4f46e5] flex items-center justify-center text-white shadow-lg shadow-indigo-500/25 animate-bounce">
-            <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
-              <path d="M19 2H5a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zm-8 4h2v2h-2V6zm0 4h2v2h-2v-2zm0 4h2v2h-2v-2zm-4-8h2v2H7V6zm0 4h2v2H7v-2zm0 4h2v2H7v-2zm10 4h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V6h2v2z" />
-            </svg>
+          <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25 animate-bounce">
+            <Sparkles className="w-6 h-6" />
           </div>
           <span className="text-sm font-semibold text-slate-700">
             Memverifikasi Hak Akses Pemilik...
           </span>
           <span className="text-xs text-slate-400">
-            Kost Yusi Owner Portal
+            {propertyName} Owner Portal
           </span>
         </div>
       </div>
@@ -165,8 +193,8 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen w-full flex bg-[#f8faff] text-slate-800 antialiased overflow-x-hidden">
-      {/* Toast Notification */}
+    <div className="min-h-screen w-full bg-[#f8faff] text-slate-800 antialiased">
+      {/* Notifikasi Toast Mengambang */}
       {toastMessage && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-slate-900/90 text-white text-xs sm:text-sm px-4 py-2.5 rounded-full shadow-xl backdrop-blur-md transition-all animate-in fade-in slide-in-from-top-4 duration-200">
           {toastMessage.type === "error" ? (
@@ -178,8 +206,8 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Left Sidebar */}
-      <div className="hidden lg:block shrink-0">
+      {/* Sidebar Navigasi Admin (Fixed Permanen di Kiri Layar Mengikuti Scroll) */}
+      <div className="hidden lg:block fixed inset-y-0 left-0 w-64 z-30 bg-white">
         <AdminSidebar
           activeTab={activeTab}
           onTabChange={(tab) => {
@@ -188,182 +216,109 @@ export default function AdminDashboardPage() {
               showToast(`Navigasi ke menu ${tab.toUpperCase()} aktif.`);
             }
           }}
-          onLogout={handleLogout}
+          onLogout={logout}
+          verificationBadge={proofs.filter((p) => p.status === "pending").length}
+          propertyName={propertyName}
+          roomCount={roomCount}
         />
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
+      {/* Kontainer Utama */}
+      <div className="lg:pl-64 min-h-screen flex flex-col">
+        <div className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl w-full mx-auto">
+        {/* Header terpusat untuk semua tab (dihindari duplikasi per tab) */}
+        {activeTab !== "buat_pengumuman" && (
+          <AdminHeader
+            ownerName={ownerName}
+            roleTitle={DEFAULT_PROPERTY.ownerRole}
+            showDatePicker={activeTab === "dasbor"}
+            onOpenAnnouncement={() => {
+              setPreviousTab(activeTab);
+              setActiveTab("buat_pengumuman");
+            }}
+            onDownloadReport={handleDownloadReport}
+          />
+        )}
+        {/* Menu Navigasi Mobile Sticky (Mengikuti Scroll Layar Kecil) */}
+        <div className="lg:hidden sticky top-3 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2.5 bg-white/90 backdrop-blur-md border-y border-slate-200/80 flex items-center gap-2 overflow-x-auto shadow-xs">
+          {ADMIN_TABS.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  if (tab.id !== "dasbor" && tab.id !== "properti" && tab.id !== "penghuni") {
+                    showToast(`Navigasi ke menu ${tab.label} aktif.`);
+                  }
+                }}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer ${
+                  isActive
+                    ? "bg-[#4f46e5] text-white shadow-xs"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Pergantian Konten Berdasarkan Tab Aktif */}
         {activeTab === "buat_pengumuman" ? (
           <CreateAnnouncementSection
             onBack={() => setActiveTab(previousTab || "dasbor")}
             onShowToast={showToast}
           />
         ) : activeTab === "pemantauan" ? (
-          <>
-            {/* Top Header matching Pemantauan Area Bersama & Ketertiban Kos */}
-            <AdminHeader
-              ownerName="Ibu Hj. Ratna Juwita"
-              roleTitle="Pemilik Kos"
-              showDatePicker={false}
-              onOpenAnnouncement={() => {
-                setPreviousTab(activeTab);
-                setActiveTab("buat_pengumuman");
-              }}
-            />
-
-            {/* Pemantauan Area Bersama & Ketertiban Kos */}
-            <CommunalAreaMonitoringSection onShowToast={showToast} />
-          </>
+          <CommunalAreaMonitoringSection onShowToast={showToast} />
         ) : activeTab === "laporan_kerusakan" ? (
-          <>
-            {/* Top Header matching Kelola Laporan Kerusakan & Fasilitas */}
-            <AdminHeader
-              ownerName="Ibu Hj. Ratna Juwita"
-              roleTitle="Pemilik Kos"
-              showDatePicker={false}
-              onOpenAnnouncement={() => {
-                setPreviousTab(activeTab);
-                setActiveTab("buat_pengumuman");
-              }}
-            />
-
-            {/* Kelola Laporan Kerusakan & Fasilitas */}
-            <MaintenanceManagementSection onShowToast={showToast} />
-          </>
+          <MaintenanceManagementSection onShowToast={showToast} />
         ) : activeTab === "tagihan_otomatis" ? (
-          <>
-            {/* Top Header matching Pengaturan Pengingat Tagihan Otomatis */}
-            <AdminHeader
-              ownerName="Ibu Hj. Ratna Juwita"
-              roleTitle="Pemilik Properti"
-              showDatePicker={false}
-              onOpenAnnouncement={() => {
-                setPreviousTab(activeTab);
-                setActiveTab("buat_pengumuman");
-              }}
-            />
-
-            {/* Pengaturan Pengingat Tagihan Otomatis */}
-            <AutoBillingReminderSection onShowToast={showToast} />
-          </>
+          <AutoBillingReminderSection onShowToast={showToast} />
         ) : activeTab === "pengaturan" ? (
-          <>
-            {/* Top Header matching Pengaturan Rekening & Saluran Pembayaran */}
-            <AdminHeader
-              ownerName="Ibu Hj. Ratna Juwita"
-              roleTitle="Pemilik Properti"
-              showDatePicker={false}
-              onOpenAnnouncement={() => {
-                setPreviousTab(activeTab);
-                setActiveTab("buat_pengumuman");
-              }}
-            />
-
-            {/* Pengaturan Rekening & Saluran Pembayaran */}
-            <PaymentSettingsSection onShowToast={showToast} />
-          </>
+          <PaymentSettingsSection onShowToast={showToast} />
         ) : activeTab === "verifikasi" ? (
-          <>
-            {/* Top Header matching Verifikasi Bukti Penghuni */}
-            <AdminHeader
-              ownerName="Ibu Hj. Ratna Juwita"
-              roleTitle="Pemilik Properti"
-              showDatePicker={false}
-              onOpenAnnouncement={() => {
-                setPreviousTab(activeTab);
-                setActiveTab("buat_pengumuman");
-              }}
-            />
-
-            {/* Verifikasi Bukti Pembayaran Section */}
-            <ProofVerificationPage
-              onShowToast={showToast}
-              onNavigateToBills={() => setActiveTab("tagihan")}
-            />
-          </>
+          <ProofVerificationPage
+            onShowToast={showToast}
+            onNavigateToBills={() => setActiveTab("tagihan")}
+          />
         ) : activeTab === "tagihan" ? (
-          <>
-            {/* Top Header matching Images 1 & 2 */}
-            <AdminHeader
-              ownerName="Ibu Hj. Ratna Juwita"
-              roleTitle="Pemilik Properti"
-              showDatePicker={false}
-              onOpenAnnouncement={() => {
-                setPreviousTab(activeTab);
-                setActiveTab("buat_pengumuman");
-              }}
-            />
-
-            {/* Tagihan & Pembayaran Management */}
-            <TagihanManagementWrapper
-              onShowToast={showToast}
-              onNavigateToProof={() => setActiveTab("verifikasi")}
-            />
-          </>
+          <TagihanManagementWrapper
+            onShowToast={showToast}
+            onNavigateToProof={() => setActiveTab("verifikasi")}
+          />
         ) : activeTab === "penghuni" ? (
-          <>
-            {/* Top Header matching Images 1, 2, 3, 4 */}
-            <AdminHeader
-              ownerName="Ibu Hj. Ratna Juwita"
-              roleTitle="Pemilik Properti"
-              showDatePicker={false}
-              onOpenAnnouncement={() => {
-                setPreviousTab(activeTab);
-                setActiveTab("buat_pengumuman");
-              }}
-            />
-
-            {/* Penghuni Section matching Images 1, 2, 3, 4 */}
-            <PenghuniManagementSection
-              onShowToast={showToast}
-              onNavigateToVerification={() => setActiveTab("verifikasi")}
-              initialSelectedTenantName={selectedTenantName}
-            />
-          </>
+          <PenghuniManagementSection
+            onShowToast={showToast}
+            onNavigateToVerification={() => setActiveTab("verifikasi")}
+            initialSelectedTenantName={selectedTenantName}
+          />
         ) : activeTab === "properti" ? (
-          <>
-            {/* Top Header without Date Picker */}
-            <AdminHeader
-              ownerName="Ibu Hj. Ratna Juwita"
-              roleTitle="Pemilik Properti"
-              showDatePicker={false}
-              onOpenAnnouncement={() => {
-                setPreviousTab(activeTab);
-                setActiveTab("buat_pengumuman");
-              }}
-            />
-
-            {/* Room Management Section */}
-            <RoomManagementSection
-              onShowToast={showToast}
-              onViewTenantProfile={(tenantName) => {
-                setSelectedTenantName(tenantName);
-                setActiveTab("penghuni");
-              }}
-            />
-          </>
+          <RoomManagement
+            onShowToast={showToast}
+            onViewTenantProfile={(tenantName) => {
+              setSelectedTenantName(tenantName);
+              setActiveTab("penghuni");
+            }}
+          />
         ) : (
           <>
-            {/* Dasbor View */}
-            <AdminHeader
-              ownerName="Ibu Hj. Ratna Juwita"
-              roleTitle="Pemilik Properti"
-              showDatePicker={true}
-              onOpenAnnouncement={() => setIsAnnouncementOpen(true)}
-              onDownloadReport={handleDownloadReport}
-            />
-
-            {/* Top KPI Cards Row */}
+            {/* Tampilan Utama Dasbor */}
             <KpiStats />
 
-            {/* Two Columns Grid: Verifikasi Bukti (Left) & Kondisi Kamar (Right) */}
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 sm:gap-6">
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 sm:gap-6 items-start">
               <div className="xl:col-span-8">
                 <PaymentVerificationSection
-                  initialProofs={proofs.length > 0 ? proofs : undefined}
+                  initialProofs={proofs}
                   onApproveProof={handleApproveProof}
                   onRejectProof={handleRejectProof}
+                  onRefresh={async () => {
+                    const data = await proofService.getPaymentProofs("all");
+                    setProofs(data);
+                    showToast("Data bukti pembayaran diperbarui");
+                  }}
                 />
               </div>
 
@@ -372,18 +327,12 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            {/* Bottom Section: Overdue Residents */}
             <OverdueResidentsSection />
           </>
         )}
+        </div>
       </div>
 
-      {/* Announcement Modal */}
-      <AnnouncementModal
-        isOpen={isAnnouncementOpen}
-        onClose={() => setIsAnnouncementOpen(false)}
-        onSend={handleSendAnnouncement}
-      />
     </div>
   );
 }
