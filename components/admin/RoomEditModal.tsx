@@ -21,6 +21,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { Room, RoomFormData } from "@/types/room";
+import { DEFAULT_PROPERTY } from "@/lib/constants";
 
 interface RoomEditModalProps {
   isOpen: boolean;
@@ -177,7 +178,7 @@ export const RoomEditModal: React.FC<RoomEditModalProps> = ({
           status,
           facilities: mappedFacilities,
           description,
-          property_name: "Wisma Melati",
+          property_name: DEFAULT_PROPERTY.name,
         },
         room?.id
       );
@@ -348,20 +349,20 @@ export const RoomEditModal: React.FC<RoomEditModalProps> = ({
               Status Awal Unit
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Option 1: Kosong */}
+              {/* Option 1: Kosong (Emerald / Siap Huni) */}
               <button
                 type="button"
                 onClick={() => setStatus("available")}
                 className={`flex items-center gap-3 p-3 rounded-2xl border text-left transition cursor-pointer ${
                   status === "available"
-                    ? "border-indigo-600 bg-indigo-50/70 text-indigo-900 shadow-xs"
+                    ? "border-emerald-600 bg-emerald-50/70 text-emerald-900 shadow-xs"
                     : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                 }`}
               >
                 <div
                   className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
                     status === "available"
-                      ? "border-indigo-600 bg-indigo-600 text-white"
+                      ? "border-emerald-600 bg-emerald-600 text-white"
                       : "border-slate-300"
                   }`}
                 >
@@ -372,20 +373,20 @@ export const RoomEditModal: React.FC<RoomEditModalProps> = ({
                 </div>
               </button>
 
-              {/* Option 2: Terisi */}
+              {/* Option 2: Terisi (Blue / Occupied) */}
               <button
                 type="button"
                 onClick={() => setStatus("occupied")}
                 className={`flex items-center gap-3 p-3 rounded-2xl border text-left transition cursor-pointer ${
                   status === "occupied"
-                    ? "border-emerald-600 bg-emerald-50/70 text-emerald-900 shadow-xs"
+                    ? "border-blue-600 bg-blue-50/70 text-blue-900 shadow-xs"
                     : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                 }`}
               >
                 <div
                   className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
                     status === "occupied"
-                      ? "border-emerald-600 bg-emerald-600 text-white"
+                      ? "border-blue-600 bg-blue-600 text-white"
                       : "border-slate-300"
                   }`}
                 >
@@ -396,7 +397,7 @@ export const RoomEditModal: React.FC<RoomEditModalProps> = ({
                 </div>
               </button>
 
-              {/* Option 3: Renovasi/Perbaikan */}
+              {/* Option 3: Renovasi/Perbaikan (Amber / Maintenance) */}
               <button
                 type="button"
                 onClick={() => setStatus("maintenance")}
