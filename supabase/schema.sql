@@ -91,7 +91,7 @@ create table if not exists public.payment_proofs (
   sender_name text,
   bank_receiver text default 'Bank Mandiri',
   account_receiver text default '137-001928374-1',
-  receiver_name text default 'Hj. Ratna Juwita (Kost Yusi)',
+  receiver_name text default 'Arifa Andya Nafiisa (Kost Yusi)',
   time_transfer text,
   transfer_date_time text,
   period text default 'November 2026',
@@ -122,7 +122,7 @@ create table if not exists public.bank_accounts (
 -- 7. Tabel Pengaturan Pembayaran & QRIS
 create table if not exists public.payment_settings (
   id uuid default gen_random_uuid() primary key,
-  qris_merchant_name text default 'KOST YUSI - RATNA JUWITA',
+  qris_merchant_name text default 'KOST YUSI - ARIFA ANDYA NAFIISA',
   qris_nmid text default 'ID1020039201928',
   qris_city text default 'JAKARTA SELATAN',
   qris_postal_code text default '12430',
@@ -241,7 +241,7 @@ create table if not exists public.announcements (
   is_pinned boolean default true,
   is_important boolean default true,
   attachments jsonb default '[]'::jsonb,
-  created_by text default 'Ibu Hj. Ratna Juwita',
+  created_by text default 'Ibu Arifa Andya Nafiisa',
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -428,3 +428,44 @@ create policy "Allow delete tenants"
   on public.tenants for delete
   to anon, authenticated
   using (true);
+
+
+-- 15. Profil properti & kebijakan sewa (Pengaturan admin)
+create table if not exists public.property_settings (
+  id uuid default gen_random_uuid() primary key,
+  profile jsonb not null default '{}'::jsonb,
+  policies jsonb not null default '{}'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table public.property_settings enable row level security;
+
+create policy "Authenticated manage property_settings"
+  on public.property_settings for all
+  to authenticated
+  using (true)
+  with check (true);
+
+
+-- 16. Kolom tambahan portal penghuni (lihat scripts/migrate-tenant-portal.mjs)
+alter table public.maintenance_tickets
+  add column if not exists tenant_id uuid references public.tenants(id) on delete set null,
+  add column if not exists location_type text default 'pribadi';
+
+alter table public.communal_fridge_items
+  add column if not exists tenant_id uuid references public.tenants(id) on delete set null,
+  add column if not exists tenant_phone text,
+  add column if not exists expiry_date date,
+  add column if not exists quantity_note text,
+  add column if not exists shelf_type text,
+  add column if not exists photo_url text,
+  add column if not exists notes text;
+
+alter table public.communal_area_items
+  add column if not exists tenant_id uuid references public.tenants(id) on delete set null,
+  add column if not exists tenant_phone text,
+  add column if not exists photo_url text;
+
+alter table public.payment_proofs
+  add column if not exists invoice_numbers text[];
