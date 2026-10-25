@@ -12,7 +12,7 @@ async function seedAdmin() {
 
   const adminEmail = 'owner@kostyusi.com';
   const adminPassword = 'admin123456';
-  const adminName = 'Ibu Hj. Ratna Juwita';
+  const adminName = 'Arifa Andya Nafiisa';
   const adminPhone = '+6281299887766';
 
   await client.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto;`);
