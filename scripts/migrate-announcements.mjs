@@ -31,7 +31,7 @@ async function migrateAnnouncements() {
         is_pinned boolean DEFAULT true,
         is_important boolean DEFAULT true,
         attachments jsonb DEFAULT '[]'::jsonb,
-        created_by text DEFAULT 'Ibu Hj. Ratna Juwita',
+        created_by text DEFAULT 'Ibu Arifa Andya Nafiisa',
         created_at timestamptz DEFAULT now(),
         updated_at timestamptz DEFAULT now()
       );
@@ -80,7 +80,7 @@ Mohon untuk menampung air secukupnya pada bak atau ember kamar masing-masing seb
           { name: 'jadwal_pembersihan_tandon.pdf', size: '1.2 MB' },
           { name: 'surat_pemberitahuan_teknisi.jpg', size: '850 KB' },
         ]),
-        'Ibu Hj. Ratna Juwita',
+        'Ibu Arifa Andya Nafiisa',
       ]
     );
 
