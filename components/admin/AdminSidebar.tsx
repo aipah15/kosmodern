@@ -20,18 +20,24 @@ interface AdminSidebarProps {
   activeTab?: string;
   onTabChange?: (tab: string) => void;
   onLogout?: () => void;
+  verificationBadge?: number;
+  propertyName?: string;
+  roomCount?: number;
 }
 
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   activeTab = "pengaturan",
   onTabChange,
   onLogout,
+  verificationBadge = 0,
+  propertyName = "Kost",
+  roomCount = 0,
 }) => {
   const menuItems = [
     { id: "dasbor", label: "Dasbor", icon: LayoutGrid },
     { id: "properti", label: "Properti & Kamar", icon: Building },
     { id: "tagihan", label: "Tagihan & Pembayaran", icon: Receipt },
-    { id: "verifikasi", label: "Verifikasi Bukti", icon: ShieldCheck, badge: 4 },
+    { id: "verifikasi", label: "Verifikasi Bukti", icon: ShieldCheck, badge: verificationBadge },
     { id: "penghuni", label: "Penghuni", icon: Users },
     { id: "pengaturan", label: "Pengaturan", icon: Settings },
     { id: "tagihan_otomatis", label: "Tagihan Otomatis", icon: Clock },
@@ -40,7 +46,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   ];
 
   return (
-    <aside className="w-64 bg-white border-r border-slate-200/80 flex flex-col justify-between shrink-0 min-h-screen p-5">
+    <aside className="w-64 bg-white border-r border-slate-200/80 flex flex-col justify-between shrink-0 h-full overflow-y-auto p-5 select-none">
       <div>
         {/* Brand Header */}
         <div className="flex items-center gap-3 px-2 py-3 mb-4">
@@ -66,10 +72,10 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           </div>
           <div className="flex-1 min-w-0">
             <h4 className="text-xs font-bold text-slate-800 truncate">
-              Yusi Kost
+              {propertyName}
             </h4>
             <p className="text-[10px] text-slate-400 font-normal">
-              10 Kamar
+              {roomCount} Kamar
             </p>
           </div>
         </div>
