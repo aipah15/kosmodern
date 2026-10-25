@@ -31,6 +31,10 @@ import {
   AnnouncementAttachment,
 } from "@/types/announcement";
 import { createClient } from "@/lib/supabase/client";
+import { uploadImageToStorage } from "@/lib/utils/storage";
+import { tenantService } from "@/modules/tenants/services/tenantService";
+import { Tenant } from "@/types/tenant";
+import { DEFAULT_PROPERTY } from "@/lib/constants";
 
 interface CreateAnnouncementSectionProps {
   onBack: () => void;
@@ -45,20 +49,35 @@ export const CreateAnnouncementSection: React.FC<CreateAnnouncementSectionProps>
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form State matching Screenshot
-  const [title, setTitle] = useState("Pemadaman Air Sementara Sabtu, 18 Oktober");
-  const [category, setCategory] = useState<AnnouncementCategory>("perawatan");
-  const [content, setContent] = useState(
-    `Yth. Seluruh Penghuni Wisma Melati,\n\nSehubungan dengan adanya pembersihan tandon air utama dan penggantian pipa suplai lantai 2, kami informasikan bahwa aliran air bersih akan dihentikan sementara pada:\n• Hari/Tanggal: Sabtu, 18 Oktober 2026\n• Waktu: Pukul 09.00 - 13.00 WIB\n• Wilayah terdampak: Seluruh kamar Lantai 1 & Lantai 2\n\nMohon untuk menampung air secukupnya pada bak atau ember kamar masing-masing sebelum jadwal pemadaman dimulai. Terima kasih atas pengertian dan kerjasamanya.`
-  );
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState<AnnouncementCategory>("umum");
+  const [content, setContent] = useState("");
   const [targetAudience, setTargetAudience] = useState<AnnouncementTarget>("all");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
   // Attachments State
-  const [attachments, setAttachments] = useState<AnnouncementAttachment[]>([
-    { name: "jadwal_pembersihan_tandon.pdf", size: "1.2 MB" },
-    { name: "surat_pemberitahuan_teknisi.jpg", size: "850 KB" },
-  ]);
+  const [attachments, setAttachments] = useState<AnnouncementAttachment[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Target penerima & opsi tampilan
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [selectedFloors, setSelectedFloors] = useState<string[]>([]);
+  const [selectedTenantIds, setSelectedTenantIds] = useState<string[]>([]);
+  const [isPinned, setIsPinned] = useState(false);
+  const [isImportant, setIsImportant] = useState(false);
+
+  useEffect(() => {
+    tenantService
+      .getTenants("active")
+      .then(setTenants)
+      .catch((err) => onShowToast?.(`Gagal memuat daftar penghuni: ${err?.message || "kesalahan jaringan"}`, "error"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const availableFloors = Array.from(new Set(tenants.map((t) => t.floor).filter(Boolean))) as string[];
+  const toggleInList = (list: string[], value: string) =>
+    list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 
   // Categories config
   const categories: {
@@ -117,23 +136,34 @@ export const CreateAnnouncementSection: React.FC<CreateAnnouncementSectionProps>
     }
   };
 
-  // Handle File Upload Dropzone
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle File Upload Dropzone (diunggah ke Supabase Storage)
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    if (attachments.length >= 3) {
+    const slots = 3 - attachments.length;
+    if (slots <= 0) {
       onShowToast?.("Maksimal 3 file lampiran.", "error");
       return;
     }
 
-    const newFiles: AnnouncementAttachment[] = Array.from(files).map((f) => ({
-      name: f.name,
-      size: (f.size / (1024 * 1024)).toFixed(1) + " MB",
-    }));
+    setIsUploading(true);
+    const uploaded: AnnouncementAttachment[] = [];
+    for (const f of Array.from(files).slice(0, slots)) {
+      const { publicUrl, error } = await uploadImageToStorage({ file: f, folder: "announcements" });
+      if (error || !publicUrl) {
+        onShowToast?.(`Gagal mengunggah ${f.name}: ${error?.message || "kesalahan tidak diketahui"}`, "error");
+        continue;
+      }
+      uploaded.push({ name: f.name, size: (f.size / (1024 * 1024)).toFixed(1) + " MB", url: publicUrl });
+    }
+    setIsUploading(false);
+    e.target.value = "";
 
-    setAttachments((prev) => [...prev, ...newFiles].slice(0, 3));
-    onShowToast?.("File lampiran berhasil ditambahkan!", "success");
+    if (uploaded.length > 0) {
+      setAttachments((prev) => [...prev, ...uploaded]);
+      onShowToast?.("File lampiran berhasil diunggah!", "success");
+    }
   };
 
   const handleRemoveAttachment = (idx: number) => {
@@ -150,6 +180,14 @@ export const CreateAnnouncementSection: React.FC<CreateAnnouncementSectionProps>
       onShowToast?.("Harap isi Konten Pengumuman.", "error");
       return;
     }
+    if (targetAudience === "floor" && selectedFloors.length === 0) {
+      onShowToast?.("Pilih minimal satu lantai tujuan.", "error");
+      return;
+    }
+    if (targetAudience === "specific" && selectedTenantIds.length === 0) {
+      onShowToast?.("Pilih minimal satu penghuni tujuan.", "error");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -161,38 +199,37 @@ export const CreateAnnouncementSection: React.FC<CreateAnnouncementSectionProps>
 
       const targetLabel =
         targetAudience === "all"
-          ? "Semua Penghuni Wisma Melati"
+          ? `Semua Penghuni ${DEFAULT_PROPERTY.name}`
           : targetAudience === "floor"
-          ? "Penghuni Lantai Tertentu"
-          : "Pilih Penghuni Tertentu";
+          ? `Penghuni ${selectedFloors.join(", ")}`
+          : `${selectedTenantIds.length} Penghuni Terpilih`;
 
       const { error } = await supabase.from("announcements").insert([
         {
-          title,
+          title: title.trim(),
           category,
           category_label: categoryLabel,
           content,
           target_audience: targetAudience,
           target_label: targetLabel,
-          is_pinned: true,
-          is_important: true,
+          target_floors: targetAudience === "floor" ? selectedFloors : null,
+          target_tenant_ids: targetAudience === "specific" ? selectedTenantIds : null,
+          is_pinned: isPinned,
+          is_important: isImportant,
           attachments,
-          created_by: "Ibu Hj. Ratna Juwita",
+          created_by: DEFAULT_PROPERTY.ownerName,
         },
       ]);
 
       if (error) throw error;
 
-      onShowToast?.("Pengumuman berhasil diterbitkan ke seluruh penghuni!", "success");
+      onShowToast?.("Pengumuman berhasil diterbitkan!", "success");
       setTimeout(() => {
         onBack();
       }, 1000);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error publishing announcement:", err);
-      onShowToast?.("Pengumuman berhasil disiarkan secara lokal.", "success");
-      setTimeout(() => {
-        onBack();
-      }, 1000);
+      onShowToast?.(`Gagal menerbitkan pengumuman: ${err?.message || "kesalahan jaringan"}`, "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -208,7 +245,7 @@ export const CreateAnnouncementSection: React.FC<CreateAnnouncementSectionProps>
           className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-700 hover:text-indigo-600 transition cursor-pointer self-start"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Kembali ke Dasbor | Kost Yusi (Gedung Utama)</span>
+          <span>Kembali ke Dasbor | {DEFAULT_PROPERTY.name}</span>
         </button>
 
         <button
@@ -512,7 +549,7 @@ export const CreateAnnouncementSection: React.FC<CreateAnnouncementSectionProps>
                 <h3 className="text-sm font-bold text-slate-900">Target Penerima</h3>
               </div>
               <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
-                24 Aktif
+                {tenants.length} Aktif
               </span>
             </div>
 
@@ -535,10 +572,10 @@ export const CreateAnnouncementSection: React.FC<CreateAnnouncementSectionProps>
                 />
                 <div>
                   <h4 className="text-xs font-bold text-slate-900">
-                    Semua Penghuni Wisma Melati
+                    Semua Penghuni {DEFAULT_PROPERTY.name}
                   </h4>
                   <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
-                    Disiarkan ke 24 kamar aktif & akun aplikasi terdaftar.
+                    Disiarkan ke {tenants.length} penghuni aktif.
                   </p>
                 </div>
               </label>
@@ -594,6 +631,56 @@ export const CreateAnnouncementSection: React.FC<CreateAnnouncementSectionProps>
                   </p>
                 </div>
               </label>
+
+              {targetAudience === "floor" && (
+                <div className="flex flex-wrap gap-2 p-3 rounded-2xl bg-slate-50 border border-slate-200/80">
+                  {availableFloors.length === 0 && (
+                    <span className="text-[11px] text-slate-400">Belum ada data lantai penghuni.</span>
+                  )}
+                  {availableFloors.map((floor) => (
+                    <button
+                      key={floor}
+                      type="button"
+                      onClick={() => setSelectedFloors((prev) => toggleInList(prev, floor))}
+                      className={`px-3 py-1 rounded-full text-[11px] font-bold border cursor-pointer ${
+                        selectedFloors.includes(floor)
+                          ? "bg-[#4f46e5] text-white border-[#4f46e5]"
+                          : "bg-white text-slate-600 border-slate-200"
+                      }`}
+                    >
+                      {floor}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {targetAudience === "specific" && (
+                <div className="max-h-48 overflow-y-auto space-y-1 p-3 rounded-2xl bg-slate-50 border border-slate-200/80">
+                  {tenants.map((t) => (
+                    <label key={t.id} className="flex items-center gap-2 text-[11px] text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedTenantIds.includes(t.id)}
+                        onChange={() => setSelectedTenantIds((prev) => toggleInList(prev, t.id))}
+                        className="accent-[#4f46e5]"
+                      />
+                      <span className="font-semibold">{t.full_name}</span>
+                      <span className="text-slate-400">Kamar {t.room_number}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2 pt-3 border-t border-slate-100">
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                <input type="checkbox" checked={isPinned} onChange={(e) => setIsPinned(e.target.checked)} className="accent-[#4f46e5]" />
+                Sematkan di beranda penghuni
+              </label>
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                <input type="checkbox" checked={isImportant} onChange={(e) => setIsImportant(e.target.checked)} className="accent-[#4f46e5]" />
+                Tandai sebagai penting
+              </label>
             </div>
           </div>
 
@@ -616,15 +703,19 @@ export const CreateAnnouncementSection: React.FC<CreateAnnouncementSectionProps>
             <div className="bg-[#fcfdfd] border border-slate-200 rounded-2xl p-4 space-y-2.5 font-sans shadow-xs">
               {/* Badges Row */}
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="px-2 py-0.5 rounded-full bg-blue-600 text-white text-[9px] font-black uppercase tracking-wider">
-                  📌 DISEMATKAN
-                </span>
+                {isPinned && (
+                  <span className="px-2 py-0.5 rounded-full bg-blue-600 text-white text-[9px] font-black uppercase tracking-wider">
+                    📌 DISEMATKAN
+                  </span>
+                )}
                 <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[9px] font-black uppercase tracking-wider">
-                  PERAWATAN & PERBAIKAN
+                  {categories.find((c) => c.id === category)?.label}
                 </span>
-                <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[9px] font-black uppercase tracking-wider">
-                  PENTING
-                </span>
+                {isImportant && (
+                  <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[9px] font-black uppercase tracking-wider">
+                    PENTING
+                  </span>
+                )}
               </div>
 
               {/* Title */}
@@ -668,11 +759,13 @@ export const CreateAnnouncementSection: React.FC<CreateAnnouncementSectionProps>
 
             <div className="bg-[#f8faff] rounded-2xl p-5 border border-indigo-100 space-y-3">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="px-2.5 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-bold">
-                  📌 DISEMATKAN
-                </span>
+                {isPinned && (
+                  <span className="px-2.5 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-bold">
+                    📌 DISEMATKAN
+                  </span>
+                )}
                 <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">
-                  PERAWATAN & PERBAIKAN
+                  {categories.find((c) => c.id === category)?.label}
                 </span>
               </div>
 
