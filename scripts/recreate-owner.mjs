@@ -29,7 +29,7 @@ async function recreate() {
     password: 'admin123456',
     options: {
       data: {
-        full_name: 'Ibu Hj. Ratna Juwita',
+        full_name: 'Arifa Andya Nafiisa',
         phone: '+6281299887766',
         role: 'owner',
       },
@@ -56,9 +56,9 @@ async function recreate() {
     WHERE id = $1;
 
     INSERT INTO public.profiles (id, full_name, phone, role)
-    VALUES ($1, 'Ibu Hj. Ratna Juwita', '+6281299887766', 'owner')
+    VALUES ($1, 'Arifa Andya Nafiisa', '+6281299887766', 'owner')
     ON CONFLICT (id) DO UPDATE
-    SET role = 'owner', full_name = 'Ibu Hj. Ratna Juwita', phone = '+6281299887766';
+    SET role = 'owner', full_name = 'Arifa Andya Nafiisa', phone = '+6281299887766';
   `, [newId]);
 
   console.log('4. Testing signInWithPassword as owner@kostyusi.com...');
