@@ -162,14 +162,14 @@ export const TenantDetailProfile: React.FC<TenantDetailProfileProps> = ({
 
         {/* Tagihan Banner Notification */}
         {tenant.bill_status === "waiting_verification" ? (
-          <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="bg-blue-50/90 border border-blue-200/80 rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
                 <Receipt className="w-4 h-4" />
               </div>
               <div className="text-xs">
-                <span className="font-medium text-slate-600">Tagihan November 2026: </span>
-                <span className="font-bold text-amber-900">
+                <span className="font-medium text-slate-600">Tagihan {tenant.bill_period || "-"}: </span>
+                <span className="font-bold text-blue-900">
                   Menunggu Verifikasi ({formattedBill})
                 </span>
               </div>
@@ -181,7 +181,7 @@ export const TenantDetailProfile: React.FC<TenantDetailProfileProps> = ({
                 if (onReviewPayment) onReviewPayment();
                 else onShowToast("Membuka verifikasi bukti pembayaran...", "info");
               }}
-              className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-extrabold text-[11px] rounded-xl shadow-xs transition cursor-pointer self-start sm:self-auto uppercase tracking-wider"
+              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-extrabold text-[11px] rounded-xl shadow-xs transition cursor-pointer self-start sm:self-auto uppercase tracking-wider"
             >
               REVIEW SEGERA
             </button>
