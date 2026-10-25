@@ -16,7 +16,7 @@ async function seedProperOwner() {
 
   const email = 'owner@kostyusi.com';
   const password = 'admin123456';
-  const name = 'Ibu Hj. Ratna Juwita';
+  const name = 'Arifa Andya Nafiisa';
   const phone = '+6281299887766';
   const userId = '5d9cbc48-d94f-46dc-8448-958e1124e6c8';
 
