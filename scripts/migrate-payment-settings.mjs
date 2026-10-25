@@ -36,7 +36,7 @@ async function migrateAndSeedPaymentSettings() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS public.payment_settings (
         id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-        qris_merchant_name text DEFAULT 'KOST YUSI - RATNA JUWITA',
+        qris_merchant_name text DEFAULT 'KOST YUSI - ARIFA ANDYA NAFIISA',
         qris_nmid text DEFAULT 'ID1020039201928',
         qris_city text DEFAULT 'JAKARTA SELATAN',
         qris_postal_code text DEFAULT '12430',
@@ -78,7 +78,7 @@ async function migrateAndSeedPaymentSettings() {
         bank_name: 'Bank Central Asia (BCA)',
         bank_code: 'BCA',
         account_number: '842-019-3821',
-        account_holder: 'Hj. Ratna Juwita',
+        account_holder: 'Arifa Andya Nafiisa',
         branch: 'KCU Wisma Asri',
         is_primary: true,
         is_active: true,
@@ -87,7 +87,7 @@ async function migrateAndSeedPaymentSettings() {
         bank_name: 'Bank Mandiri',
         bank_code: 'MNDR',
         account_number: '137-00-1928374-1',
-        account_holder: 'Hj. Ratna Juwita',
+        account_holder: 'Arifa Andya Nafiisa',
         branch: 'KC Fatmawati',
         is_primary: false,
         is_active: true,
@@ -96,7 +96,7 @@ async function migrateAndSeedPaymentSettings() {
         bank_name: 'Bank Rakyat Indonesia (BRI)',
         bank_code: 'BRI',
         account_number: '0341-01-082910-50-2',
-        account_holder: 'Ratna Juwita',
+        account_holder: 'Arifa Andya Nafiisa',
         branch: 'Unit Cilandak Barat',
         is_primary: false,
         is_active: true,
@@ -126,7 +126,7 @@ async function migrateAndSeedPaymentSettings() {
       INSERT INTO public.payment_settings (
         qris_merchant_name, qris_nmid, qris_city, qris_postal_code, qris_is_active
       ) VALUES (
-        'KOST YUSI - RATNA JUWITA', 'ID1020039201928', 'JAKARTA SELATAN', '12430', true
+        'KOST YUSI - ARIFA ANDYA NAFIISA', 'ID1020039201928', 'JAKARTA SELATAN', '12430', true
       );
     `);
 
