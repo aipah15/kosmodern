@@ -2,6 +2,8 @@
 
 import React, { useState } from "react";
 import { Megaphone, X, Calendar, UserCheck } from "lucide-react";
+import { useTenantPortal } from "@/modules/tenant-portal/context";
+import { formatDateIndo, getRelativeTimeIndo } from "@/lib/utils/date";
 
 interface TenantAnnouncementProps {
   initialVisible?: boolean;
@@ -13,7 +15,17 @@ export const TenantAnnouncement: React.FC<TenantAnnouncementProps> = ({
   const [isVisible, setIsVisible] = useState(initialVisible);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  if (!isVisible) return null;
+  const { announcements, owner } = useTenantPortal();
+
+  // Pengumuman yang disematkan lebih dulu, lalu yang terbaru
+  const latest =
+    [...announcements].sort(
+      (a, b) =>
+        Number(!!b.is_pinned) - Number(!!a.is_pinned) ||
+        new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+    )[0] ?? null;
+
+  if (!isVisible || !latest) return null;
 
   return (
     <>
@@ -33,12 +45,12 @@ export const TenantAnnouncement: React.FC<TenantAnnouncementProps> = ({
               PENGUMUMAN KOS
             </span>
             <span className="text-[10px] text-slate-400 font-normal mr-1">
-              Hari Ini
+              {getRelativeTimeIndo(latest.created_at)}
             </span>
           </div>
 
           <p className="text-xs text-slate-700 font-semibold leading-relaxed line-clamp-2">
-            Ibu Hj. Ratna Juwita: Pembersihan toren air bersih hari Sabtu pk 09:00 WIB. Mohon...
+            {latest.title}: {latest.content}
           </p>
         </div>
 
@@ -67,7 +79,7 @@ export const TenantAnnouncement: React.FC<TenantAnnouncementProps> = ({
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">Pengumuman Kos</h3>
-                  <p className="text-[10px] text-slate-400">Kost Yusi Management</p>
+                  <p className="text-[10px] text-slate-400">{owner.propertyName} Management</p>
                 </div>
               </div>
               <button
@@ -82,15 +94,15 @@ export const TenantAnnouncement: React.FC<TenantAnnouncementProps> = ({
             <div className="mt-4 space-y-3">
               <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
                 <UserCheck className="w-3.5 h-3.5 text-[#4f46e5]" />
-                <span>Pengirim: <strong>Ibu Hj. Ratna Juwita (Pemilik)</strong></span>
+                <span>Pengirim: <strong>{latest.created_by || owner.name}</strong></span>
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
                 <Calendar className="w-3.5 h-3.5 text-[#4f46e5]" />
-                <span>Jadwal: <strong>Sabtu, pk 09:00 - 12:00 WIB</strong></span>
+                <span>Diterbitkan: <strong>{formatDateIndo(latest.created_at)}</strong></span>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-indigo-50/50 border border-indigo-100/60 text-xs text-slate-700 leading-relaxed font-normal">
-                Selamat pagi adik-adik penghuni Kost Yusi. Diberitahukan bahwa pada hari Sabtu ini akan dilakukan pengurasan dan pembersihan toren air bersih berkala. Aliran air akan dihentikan sementara dari pukul 09:00 hingga 12:00 WIB. Mohon untuk menampung air bersih secukupnya di ember kamar masing-masing. Terima kasih atas pengertian dan kerjasamanya.
+              <div className="p-3.5 rounded-2xl bg-indigo-50/50 border border-indigo-100/60 text-xs text-slate-700 leading-relaxed font-normal whitespace-pre-line">
+                {latest.content}
               </div>
             </div>
 
