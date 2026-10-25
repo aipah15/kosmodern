@@ -42,12 +42,12 @@ export const TenantFormManage: React.FC<TenantFormManageProps> = ({
   const [emergencyPhone, setEmergencyPhone] = useState("");
 
   const [selectedRoomId, setSelectedRoomId] = useState("");
-  const [checkInDate, setCheckInDate] = useState("2024-09-01");
+  const [checkInDate, setCheckInDate] = useState(new Date().toISOString().slice(0, 10));
   const [dueDateDay, setDueDateDay] = useState(1);
   const [rentAmount, setRentAmount] = useState(1500000);
   const [depositAmount, setDepositAmount] = useState(500000);
 
-  const [invitationCode, setInvitationCode] = useState("KM-B04-9842");
+  const [invitationCode, setInvitationCode] = useState("");
   const [copiedLink, setCopiedLink] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -66,48 +66,41 @@ export const TenantFormManage: React.FC<TenantFormManageProps> = ({
       setOccupation(
         tenant.occupation
           ? `${tenant.occupation}${tenant.institution ? `/${tenant.institution}` : ""}`
-          : "Mahasiswa/Universitas Negeri Malang"
+          : ""
       );
       setEmergencyName(
         tenant.emergency_contact_name
           ? `${tenant.emergency_contact_name} (${tenant.emergency_contact_relation || "Keluarga"})`
-          : "Bpk. Hendra Pratama (Ayah)"
+          : ""
       );
-      setEmergencyPhone(tenant.emergency_contact_phone || "0811-9876-5432");
+      setEmergencyPhone(tenant.emergency_contact_phone || "");
 
       // Match room
       const currentRoom = rooms.find((r) => r.room_number === tenant.room_number);
       if (currentRoom) {
         setSelectedRoomId(currentRoom.id);
-        setRentAmount(Number(currentRoom.price) || 1500000);
-      } else if (rooms.length > 0) {
-        setSelectedRoomId(rooms[0].id);
-        setRentAmount(Number(rooms[0].price) || 1500000);
+        setRentAmount(Number(currentRoom.price) || 0);
       }
 
-      setCheckInDate(tenant.check_in_date || "2024-09-01");
+      setCheckInDate(tenant.check_in_date || new Date().toISOString().slice(0, 10));
       setDueDateDay(tenant.due_date_day || 1);
-      setDepositAmount(Number(tenant.deposit_amount) || 500000);
-      setInvitationCode(tenant.invitation_code || `KM-${tenant.room_number || "B04"}-${Math.floor(1000 + Math.random() * 9000)}`);
+      setDepositAmount(Number(tenant.deposit_amount) || 0);
+      setInvitationCode(tenant.invitation_code || "");
     } else {
-      // Default initial data for new tenant creation matching Image 4
-      setFullName("Azka Andya Safira");
-      setNik("321123456789");
-      setPhone("812-3456-7890");
-      setEmail("azkaandya@gmail.com");
-      setOccupation("Mahasiswa/Universitas Negeri Malang");
-      setEmergencyName("Bpk. Hendra Pratama (Ayah)");
-      setEmergencyPhone("0811-9876-5432");
-
-      const defaultRoom = rooms.find((r) => r.room_number === "B-04") || rooms[0];
-      if (defaultRoom) {
-        setSelectedRoomId(defaultRoom.id);
-        setRentAmount(Number(defaultRoom.price) || 1500000);
-      }
-      setCheckInDate("2024-09-01");
+      // Penghuni baru: formulir dimulai kosong
+      setFullName("");
+      setNik("");
+      setPhone("");
+      setEmail("");
+      setOccupation("");
+      setEmergencyName("");
+      setEmergencyPhone("");
+      setSelectedRoomId("");
+      setRentAmount(0);
+      setDepositAmount(0);
       setDueDateDay(1);
-      setDepositAmount(500000);
-      setInvitationCode("KM-B04-9842");
+      setCheckInDate(new Date().toISOString().slice(0, 10));
+      setInvitationCode("");
     }
   }, [tenant, rooms]);
 
@@ -115,15 +108,14 @@ export const TenantFormManage: React.FC<TenantFormManageProps> = ({
     setSelectedRoomId(roomId);
     const room = rooms.find((r) => r.id === roomId);
     if (room) {
-      setRentAmount(Number(room.price) || 1500000);
-      setInvitationCode(`KM-${room.room_number.replace(/^Kamar\s+/i, "")}-${Math.floor(1000 + Math.random() * 9000)}`);
+      setRentAmount(Number(room.price) || 0);
     }
   };
 
-  const inviteUrl = `kosmodern.id/join?code=${invitationCode}`;
+  const inviteUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/?code=${invitationCode}`;
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(`https://${inviteUrl}`);
+    navigator.clipboard.writeText(inviteUrl);
     setCopiedLink(true);
     onShowToast("Tautan undangan digital disalin ke clipboard!", "success");
     setTimeout(() => setCopiedLink(false), 2000);
@@ -135,7 +127,7 @@ export const TenantFormManage: React.FC<TenantFormManageProps> = ({
     const selectedRoom = rooms.find((r) => r.id === selectedRoomId);
     const roomName = selectedRoom ? `Kamar ${selectedRoom.room_number}` : "Kamar Kost Yusi";
 
-    const text = `Halo Kak ${fullName}, selamat datang di Kost Yusi!\n\nBerikut tautan aktivasi mandiri portal penghuni untuk ${roomName}:\nhttps://${inviteUrl}\n\nKode Undangan: ${invitationCode}\nSilakan gunakan tautan di atas untuk melengkapi profil & cek tagihan berkala. Terima kasih!`;
+    const text = `Halo Kak ${fullName}, selamat datang di Kost Yusi!\n\nBerikut tautan aktivasi mandiri portal penghuni untuk ${roomName}:\n${inviteUrl}\n\nKode Undangan: ${invitationCode}\nSilakan gunakan tautan di atas untuk melengkapi profil & cek tagihan berkala. Terima kasih!`;
     window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(text)}`, "_blank");
   };
 
@@ -143,6 +135,10 @@ export const TenantFormManage: React.FC<TenantFormManageProps> = ({
     e.preventDefault();
     if (!fullName || !phone) {
       onShowToast("Mohon lengkapi Nama dan Nomor WhatsApp aktif.", "error");
+      return;
+    }
+    if (!tenant && !selectedRoomId) {
+      onShowToast("Pilih kamar untuk penghuni baru.", "error");
       return;
     }
 
@@ -181,9 +177,9 @@ export const TenantFormManage: React.FC<TenantFormManageProps> = ({
           emergency_contact_relation: emRel,
           emergency_contact_phone: emergencyPhone,
           room_id: selectedRoomId,
-          room_number: selectedRoom ? selectedRoom.room_number : "B-04",
-          floor: selectedRoom ? selectedRoom.floor : "Lt. 1",
-          room_type: selectedRoom ? selectedRoom.room_type : "Deluxe",
+          room_number: selectedRoom ? selectedRoom.room_number : "",
+          floor: selectedRoom ? selectedRoom.floor : "",
+          room_type: selectedRoom ? selectedRoom.room_type : "",
           check_in_date: checkInDate,
           due_date_day: Number(dueDateDay) || 1,
           rent_amount: Number(rentAmount),
@@ -504,6 +500,7 @@ export const TenantFormManage: React.FC<TenantFormManageProps> = ({
         </div>
 
         {/* Digital Invite Row */}
+        {invitationCode && (
         <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="space-y-1.5 flex-1 min-w-0">
             <div className="flex items-center gap-2">
@@ -550,6 +547,7 @@ export const TenantFormManage: React.FC<TenantFormManageProps> = ({
             </span>
           </button>
         </div>
+        )}
       </div>
     </form>
   );
