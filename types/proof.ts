@@ -3,6 +3,7 @@ export type ProofStatus = 'pending' | 'approved' | 'rejected';
 export interface PaymentProofItem {
   id: string;
   invoice_number?: string;
+  invoice_numbers?: string[] | null;
   tenant_id?: string;
   tenant_name: string;
   resident_name: string;
@@ -30,4 +31,4 @@ export interface PaymentProofItem {
   updated_at?: string;
 }
 
-export type ProofFilterTab = 'pending' | 'all' | 'rejected';
+export type ProofFilterTab = 'pending' | 'all' | 'approved' | 'rejected';
