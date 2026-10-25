@@ -1,6 +1,9 @@
 "use client";
 
 import React from "react";
+import { Receipt, Wrench, Package, Refrigerator, ChevronRight } from "lucide-react";
+import { useTenantPortal } from "@/modules/tenant-portal/context";
+import { areaItemMeta } from "@/modules/tenant-portal/areaItems";
 
 interface ServiceShortcutsGridProps {
   onShortcutClick: (shortcutId: "riwayat" | "rusak" | "barang" | "kulkas") => void;
@@ -9,142 +12,153 @@ interface ServiceShortcutsGridProps {
 export const ServiceShortcutsGrid: React.FC<ServiceShortcutsGridProps> = ({
   onShortcutClick,
 }) => {
+  const { billing, tickets, areaItems, fridgeItems, tenant } = useTenantPortal();
+
+  // Lencana dihitung dari data penghuni yang login
+  const billBadge =
+    billing.state === "lunas"
+      ? { text: "Lunas", cls: "text-emerald-700 bg-emerald-50 border-emerald-200" }
+      : billing.state === "verifikasi"
+      ? { text: "Verifikasi", cls: "text-blue-700 bg-blue-50 border-blue-200" }
+      : billing.state === "terlambat"
+      ? { text: "Terlambat", cls: "text-rose-700 bg-rose-50 border-rose-200" }
+      : { text: "Belum Bayar", cls: "text-amber-700 bg-amber-50 border-amber-200" };
+  const activeTickets = tickets.filter((t) => t.tenant_id === tenant.id && (t.status === "baru" || t.status === "diproses")).length;
+  const myArea = areaItems.filter((a) => a.tenant_id === tenant.id);
+  const overdueArea = myArea.filter((a) => areaItemMeta(a).isOverdue).length;
+  const myFridge = fridgeItems.filter((f) => f.tenant_id === tenant.id).length;
+
   return (
-    <div className="w-full mb-8">
+    <div className="w-full mb-6">
       {/* Section Title */}
-      <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight mb-3">
-        Pintasan Layanan Kos
-      </h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+          Pintasan Layanan Kos
+        </h3>
+        <span className="text-[11px] text-slate-400 font-medium">Akses Cepat</span>
+      </div>
 
       {/* 2x2 Grid */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         {/* Card 1: Riwayat Bayar */}
         <div
           onClick={() => onShortcutClick("riwayat")}
-          className="bg-white rounded-2xl p-4 border border-slate-100/90 shadow-2xs hover:shadow-md hover:border-indigo-100 transition-all cursor-pointer flex flex-col justify-between group active:scale-[0.98]"
+          className="bg-white rounded-2xl p-4 border border-slate-100/90 shadow-2xs hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer flex flex-col justify-between group active:scale-[0.98]"
         >
           <div>
-            <div className="w-10 h-10 rounded-xl bg-[#eeeffe] text-[#4f46e5] flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
-              {/* Receipt / Invoice Document Icon */}
-              <svg
-                className="w-5 h-5 text-[#4f46e5]"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" />
-                <path d="M8 7h8" />
-                <path d="M8 11h8" />
-                <path d="M8 15h4" />
-              </svg>
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 text-[#4f46e5] flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Receipt className="w-5 h-5" />
+              </div>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${billBadge.cls}`}>
+                {billBadge.text}
+              </span>
             </div>
 
-            <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
-              Riwayat Bayar
+            <h4 className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition leading-snug">
+              Riwayat & Kwitansi
             </h4>
-            <p className="text-[11px] text-slate-400 leading-snug mt-1 font-normal">
-              Riwayat pembayaran penghuni setiap bulan
+            <p className="text-[11px] text-slate-400 leading-snug mt-1 font-normal line-clamp-2">
+              Bukti bayar sah & tagihan bulanan
             </p>
+          </div>
+
+          <div className="pt-2 flex items-center justify-end text-indigo-600 font-medium text-[11px]">
+            <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
           </div>
         </div>
 
         {/* Card 2: Lapor Rusak */}
         <div
           onClick={() => onShortcutClick("rusak")}
-          className="bg-white rounded-2xl p-4 border border-slate-100/90 shadow-2xs hover:shadow-md hover:border-rose-100 transition-all cursor-pointer flex flex-col justify-between group active:scale-[0.98]"
+          className="bg-white rounded-2xl p-4 border border-slate-100/90 shadow-2xs hover:shadow-md hover:border-rose-200 transition-all cursor-pointer flex flex-col justify-between group active:scale-[0.98]"
         >
           <div>
-            <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
-              {/* Toolbox / Repair Icon */}
-              <svg
-                className="w-5 h-5 text-rose-500"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <rect x="2" y="7" width="20" height="14" rx="2" />
-                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-                <circle cx="12" cy="12" r="1.5" />
-              </svg>
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Wrench className="w-5 h-5" />
+              </div>
+              {activeTickets > 0 && (
+                <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                  {activeTickets} Berjalan
+                </span>
+              )}
             </div>
 
-            <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
-              Lapor Rusak
+            <h4 className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-rose-600 transition leading-snug">
+              Lapor Kerusakan
             </h4>
-            <p className="text-[11px] text-slate-400 leading-snug mt-1 font-normal">
-              AC, air bocor, lampu mati & WiFi
+            <p className="text-[11px] text-slate-400 leading-snug mt-1 font-normal line-clamp-2">
+              AC, air bocor, lampu & Wi-Fi
             </p>
+          </div>
+
+          <div className="pt-2 flex items-center justify-end text-rose-600 font-medium text-[11px]">
+            <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
           </div>
         </div>
 
         {/* Card 3: Barang Luar */}
         <div
           onClick={() => onShortcutClick("barang")}
-          className="bg-white rounded-2xl p-4 border border-slate-100/90 shadow-2xs hover:shadow-md hover:border-purple-100 transition-all cursor-pointer flex flex-col justify-between group active:scale-[0.98]"
+          className="bg-white rounded-2xl p-4 border border-slate-100/90 shadow-2xs hover:shadow-md hover:border-purple-200 transition-all cursor-pointer flex flex-col justify-between group active:scale-[0.98]"
         >
           <div>
-            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
-              {/* Storage / Box Archive Icon */}
-              <svg
-                className="w-5 h-5 text-purple-600"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
-                <path d="m3.3 7 8.7 5 8.7-5" />
-                <path d="M12 22V12" />
-              </svg>
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Package className="w-5 h-5" />
+              </div>
+              {myArea.length > 0 && (
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    overdueArea > 0
+                      ? "text-rose-700 bg-rose-50 border-rose-200"
+                      : "text-emerald-700 bg-emerald-50 border-emerald-200"
+                  }`}
+                >
+                  {overdueArea > 0 ? `${overdueArea} Lewat Batas` : `${myArea.length} Barang`}
+                </span>
+              )}
             </div>
 
-            <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
-              Barang Luar
+            <h4 className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-purple-600 transition leading-snug">
+              Barang Luar Kamar
             </h4>
-            <p className="text-[11px] text-slate-400 leading-snug mt-1 font-normal">
-              Registrasi rak sepatu & gantungan jemuran
+            <p className="text-[11px] text-slate-400 leading-snug mt-1 font-normal line-clamp-2">
+              Jemuran, rak sepatu & teras
             </p>
+          </div>
+
+          <div className="pt-2 flex items-center justify-end text-purple-600 font-medium text-[11px]">
+            <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
           </div>
         </div>
 
         {/* Card 4: Kulkas Bersama */}
         <div
           onClick={() => onShortcutClick("kulkas")}
-          className="bg-white rounded-2xl p-4 border border-slate-100/90 shadow-2xs hover:shadow-md hover:border-emerald-100 transition-all cursor-pointer flex flex-col justify-between group active:scale-[0.98]"
+          className="bg-white rounded-2xl p-4 border border-slate-100/90 shadow-2xs hover:shadow-md hover:border-emerald-200 transition-all cursor-pointer flex flex-col justify-between group active:scale-[0.98]"
         >
           <div>
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
-              {/* Refrigerator Icon exact to screenshot */}
-              <svg
-                className="w-5 h-5 text-emerald-600"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <rect x="5" y="2" width="14" height="20" rx="3" />
-                <line x1="5" y1="10" x2="19" y2="10" />
-                <line x1="8" y1="5" x2="8" y2="8" />
-                <line x1="8" y1="13" x2="8" y2="16" />
-              </svg>
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Refrigerator className="w-5 h-5" />
+              </div>
+              <span className="text-[10px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full">
+                {myFridge} Item
+              </span>
             </div>
 
-            <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
+            <h4 className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-emerald-600 transition leading-snug">
               Kulkas Bersama
             </h4>
-            <p className="text-[11px] text-slate-400 leading-snug mt-1 font-normal">
-              Label stiker nama & cek masa simpan
+            <p className="text-[11px] text-slate-400 leading-snug mt-1 font-normal line-clamp-2">
+              Cek batas simpan makanan
             </p>
+          </div>
+
+          <div className="pt-2 flex items-center justify-end text-emerald-600 font-medium text-[11px]">
+            <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
           </div>
         </div>
       </div>
